@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+target/
+dist/
+apps/desktop/src-tauri/gen/
+packages/shared/src/database.types.ts
+supabase/.temp
