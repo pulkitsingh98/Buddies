@@ -687,7 +687,10 @@ mod tests {
         touch(d, "app.lnk", "x");
         touch(d, "big.zip.crdownload", "x");
         fs::create_dir(d.join("Projects")).unwrap();
-        fs::write(d.join("fresh.txt"), "just saved").unwrap(); // modified now
+        // "In use": on Windows, a file another program holds open; elsewhere, one modified just now.
+        fs::write(d.join("fresh.txt"), "just saved").unwrap();
+        #[cfg(windows)]
+        let _held_open = fs::File::open(d.join("fresh.txt")).unwrap();
         let p = plan(d, &d.join("Tidied by Cutu/2026-11-23")).unwrap();
         let names: Vec<_> = p
             .moves
@@ -703,7 +706,6 @@ mod tests {
         assert!(reasons.contains(&(".hidden", "hidden")));
         assert!(reasons.contains(&("app.lnk", "shortcut")));
         assert!(reasons.contains(&("big.zip.crdownload", "still downloading")));
-        #[cfg(not(windows))]
         assert!(reasons.contains(&("fresh.txt", "in use")));
     }
 
