@@ -1,7 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "settings",
-  "description": "Settings window: app info and updater.",
-  "windows": ["settings"],
-  "permissions": ["core:default", "updater:default", "process:allow-restart", "log:default"]
+  "identifier": "app-windows",
+  "description": "Settings and pet-creator windows.",
+  "windows": ["settings", "creator"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "updater:default",
+    "process:allow-restart",
+    "log:default"
+  ]
 }

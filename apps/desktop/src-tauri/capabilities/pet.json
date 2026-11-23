@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pet-windows",
+  "description": "Pet windows: move/show themselves and query monitors. Nothing else.",
+  "windows": ["pet-*"],
+  "permissions": [
+    "core:event:default",
+    "core:window:default",
+    "core:window:allow-set-position",
+    "core:window:allow-show",
+    "log:default"
+  ]
+}

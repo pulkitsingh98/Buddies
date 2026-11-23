@@ -1,0 +1,207 @@
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+#shadow {
+  position: absolute;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.22);
+  filter: blur(2px);
+  transition: opacity 0.2s;
+}
+#stage {
+  position: absolute;
+}
+#pose {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 50%;
+  transition:
+    transform 0.6s ease-in-out,
+    opacity 0.6s;
+}
+#stage[data-state='drag'] #pose,
+#stage[data-state='fall'] #pose {
+  transition-duration: 0.1s;
+}
+#motion,
+#flip {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+}
+#sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  -webkit-user-drag: none;
+}
+
+/* ---- state animations (compositor-driven) ---- */
+#stage[data-state='idle'] #motion,
+#stage[data-state='sit'] #motion {
+  animation: breathe 3s ease-in-out infinite;
+}
+#stage.sleepy #motion {
+  animation-duration: 4.5s;
+}
+#stage[data-state='sleep'] #motion {
+  animation: breathe 5s ease-in-out infinite;
+}
+#stage[data-state='walk'] #motion {
+  animation: hop 0.9s ease-in-out infinite;
+}
+#stage[data-state='wake'] #motion {
+  animation: stretch 1.2s ease-in-out;
+}
+#stage[data-state='drag'] #motion {
+  animation: wobble 0.45s ease-in-out infinite;
+}
+#stage[data-state='land'] #motion {
+  animation: squash 0.35s ease-out;
+}
+#stage[data-state='petted'] #motion {
+  animation: happy 1.6s ease-out;
+}
+#stage[data-state='celebrate'] #motion {
+  animation: jump 2.4s ease-in-out;
+}
+
+@keyframes breathe {
+  50% {
+    transform: scale(0.99, 1.02);
+  }
+}
+@keyframes hop {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0) scale(1.03, 0.95);
+  }
+  25% {
+    transform: translateY(-6%) rotate(-3deg);
+  }
+  75% {
+    transform: translateY(-6%) rotate(3deg);
+  }
+}
+@keyframes stretch {
+  50% {
+    transform: scale(0.95, 1.1);
+  }
+}
+@keyframes wobble {
+  25% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(5deg);
+  }
+}
+@keyframes squash {
+  0% {
+    transform: scale(1.15, 0.8);
+  }
+}
+@keyframes happy {
+  10%,
+  30%,
+  50% {
+    transform: translateY(-8%) rotate(-5deg);
+  }
+  20%,
+  40%,
+  60% {
+    transform: translateY(0) rotate(5deg);
+  }
+}
+@keyframes jump {
+  0%,
+  33%,
+  66%,
+  100% {
+    transform: translateY(0) scale(1.05, 0.92);
+  }
+  16% {
+    transform: translateY(-25%) rotate(-8deg) scale(0.97, 1.06);
+  }
+  50% {
+    transform: translateY(-25%) rotate(8deg) scale(0.97, 1.06);
+  }
+  83% {
+    transform: translateY(-18%) scale(0.97, 1.06);
+  }
+}
+
+/* Reduced motion: keep only gentle breathing. */
+.reduced #stage[data-state] #motion {
+  animation: breathe 4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  #stage[data-state] #motion {
+    animation: breathe 4s ease-in-out infinite;
+  }
+}
+
+/* ---- hearts ---- */
+.heart {
+  position: absolute;
+  color: #ff6b8a;
+  font-size: 16px;
+  text-shadow:
+    0 0 2px #fff,
+    0 0 2px #fff;
+  pointer-events: none;
+  animation: float-up 1.4s ease-out both;
+}
+@keyframes float-up {
+  from {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), -70px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* ---- speech bubble ---- */
+#bubble {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 12px);
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 14px;
+  background: #fff;
+  color: #2b2320;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: center;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+}
+#bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-bottom: 0;
+  border-top-color: #fff;
+}

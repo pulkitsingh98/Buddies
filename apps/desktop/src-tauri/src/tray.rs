@@ -5,10 +5,13 @@ use tauri::{
     AppHandle, Emitter,
 };
 
-use crate::windows;
+use std::time::Duration;
+
+use crate::{pet_windows, settings, windows};
 
 /// Tray menu item ids. Items not yet implemented emit `tray://<id>` to the frontend.
 const ITEMS: &[(&str, &str)] = &[
+    ("new_pet", "New Pet…"),
     ("toggle_pets", "Show / Hide Pets"),
     ("focus", "Start Focus Timer"),
     ("tidy", "Tidy Desktop…"),
@@ -45,6 +48,17 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                     log::error!("failed to open settings: {e}");
                 }
             }
+            "new_pet" => {
+                if let Err(e) = windows::show_creator(app) {
+                    log::error!("failed to open creator: {e}");
+                }
+            }
+            "toggle_pets" => {
+                if let Err(e) = settings::apply(app, |s| s.pets_visible = !s.pets_visible) {
+                    log::error!("failed to toggle pets: {e}");
+                }
+            }
+            "pause" => pet_windows::pause_for(app, Duration::from_secs(3600)),
             other => {
                 let _ = app.emit(&format!("tray://{other}"), ());
             }

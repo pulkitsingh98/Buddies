@@ -1,39 +1,41 @@
-:root {
-  color-scheme: light dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
-  --bg: #fffaf5;
-  --fg: #2b2320;
-  --muted: #7a6d66;
-  --accent: #f08a5d;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1f1a18;
-    --fg: #f3ece8;
-    --muted: #a99c95;
-  }
-}
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-}
 .settings {
   padding: 24px;
 }
-.muted {
-  color: var(--muted);
+.pets {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
 }
-button {
-  font: inherit;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 0;
-  background: var(--accent);
-  color: white;
-  cursor: pointer;
+.pet {
+  display: grid;
+  grid-template-columns: 56px 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.pet img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+.pet .name {
+  font-weight: 600;
+}
+.slider {
+  display: grid;
+  grid-template-columns: 170px 1fr 56px;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 28px;
 }

@@ -798,15 +798,21 @@ dependencies = [
 name = "deskpals"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "log",
+ "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tauri",
  "tauri-build",
  "tauri-plugin-log",
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tempfile",
+ "tokio",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
