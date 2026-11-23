@@ -319,6 +319,8 @@ export class PetView {
     this.bubble.classList.add('entering');
     this.bubble.hidden = false;
     this.bubble.style.bottom = `${window.innerHeight - this.box.top + 8}px`;
+    // Never taller than the space above the pet: long messages scroll instead of being clipped.
+    this.bubble.style.setProperty('--bubble-max', `${Math.max(70, this.box.top - 14)}px`);
   }
 
   /** Types the text in over about a second (instantly with reduced motion). */

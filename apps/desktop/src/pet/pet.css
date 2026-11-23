@@ -218,7 +218,9 @@ body {
   position: absolute;
   left: 50%;
   translate: -50% 0;
-  max-width: calc(100% - 12px);
+  width: max-content;
+  min-width: 120px;
+  max-width: min(270px, calc(100% - 16px));
   box-sizing: border-box;
   padding: 8px 12px 9px;
   border-radius: 18px;
@@ -261,6 +263,15 @@ body {
 }
 #bubble .text {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* Only the text scrolls (the tail and sparkle sit outside the bubble's box). */
+  max-height: calc(var(--bubble-max, 400px) - 56px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+#bubble .text::-webkit-scrollbar {
+  display: none;
 }
 #bubble.entering {
   animation: bubble-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;

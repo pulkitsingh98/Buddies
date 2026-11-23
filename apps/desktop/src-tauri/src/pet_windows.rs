@@ -29,10 +29,12 @@ pub fn label(id: &str) -> String {
     format!("{LABEL_PREFIX}{id}")
 }
 
-/// Window size for a pet of the given height: room around it for hops, hearts and a speech bubble.
+/// Window size for a pet of the given height: room around it for hops, hearts and a speech
+/// bubble (wide enough that messages don't wrap into a tall column). The extra space is
+/// transparent and click-through.
 pub fn window_size(pet_size: u32) -> (f64, f64) {
     let s = pet_size as f64;
-    ((s * 1.5).round(), (s * 1.8).round())
+    ((s * 1.5).max(300.0).round(), (s * 1.8 + 140.0).round())
 }
 
 fn is_paused(app: &AppHandle) -> bool {
@@ -150,8 +152,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn window_has_headroom_above_pet() {
-        let (w, h) = window_size(150);
-        assert_eq!((w, h), (225.0, 270.0));
+    fn window_has_room_for_bubbles() {
+        assert_eq!(window_size(150), (300.0, 410.0));
+        // big pets scale up beyond the minimum width
+        assert_eq!(window_size(300), (450.0, 680.0));
     }
 }
