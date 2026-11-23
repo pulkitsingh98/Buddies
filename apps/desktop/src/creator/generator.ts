@@ -11,8 +11,10 @@ export interface PetGeneratorInput {
   consentConfirmed: boolean;
   /** The framed, background-removed subject (alpha = subject). Used by the cutout style. */
   cutout?: RawImage;
-  /** The original photo, for styles that redraw it (Phase 5). Never stored. */
+  /** The original photo, for styles that redraw it. Never stored. */
   photo?: ImageBitmap;
+  /** Owner's description for redrawn styles, e.g. "long wavy brown hair, red hoodie". */
+  details?: string;
 }
 
 export interface GeneratedPet {
@@ -114,10 +116,12 @@ export class CartoonGenerator implements PetGenerator {
     const report = () => onProgress?.({ ...progress, previews: { ...progress.previews } });
     report();
 
+    const details = (input.details ?? '').trim().slice(0, 200);
     const base = await callGenerator({
       mode: 'character',
       kind: input.kind,
       photo: photoDataUrl(input.photo),
+      details,
     });
     const cut: Record<string, RawImage> = { neutral: await this.cutOut(base) };
     progress.previews.neutral = await toPngDataUrl(cut.neutral ?? (await decodeDataUrl(base)));
@@ -130,7 +134,7 @@ export class CartoonGenerator implements PetGenerator {
       for (let frame = queue.shift(); frame && !fatal; frame = queue.shift()) {
         for (let attempt = 0; ; attempt++) {
           try {
-            const drawn = await callGenerator({ mode: 'frame', frame, reference: base });
+            const drawn = await callGenerator({ mode: 'frame', frame, reference: base, details });
             const img = await this.cutOut(drawn);
             cut[frame] = img;
             progress.previews[frame] = await toPngDataUrl(img);

@@ -14,14 +14,30 @@ export const STYLE = [
 const GESTURE_NOTE =
   'Adapt gestures to the character’s body (hands, paws, wings, or tiny stubby arms for objects).';
 
-export function characterPrompt(kind: string): string {
+/** Cleans the owner's free-text description: one line, max 200 characters. */
+export function cleanDetails(details: unknown): string {
+  if (typeof details !== 'string') return '';
+  return details
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
+function detailsClause(details: string): string {
+  return details
+    ? ` The owner describes the character like this — follow it exactly, it overrides the photo where they differ: "${details}".`
+    : '';
+}
+
+export function characterPrompt(kind: string, details = ''): string {
   const subject =
     kind === 'object'
       ? 'the object in this photo into a cute living character with a friendly face and tiny arms and legs, keeping its shape, colours and details'
       : kind === 'animal'
         ? 'the animal in this photo into a cute cartoon character, keeping its breed/species, fur or feather colours, markings and any collar or accessories'
         : 'the person in this photo into a cute cartoon character that is clearly recognisable as them, keeping their hair colour and style, skin tone, face shape, glasses, facial hair, clothing colours and accessories';
-  return `Using image 0 as reference, turn ${subject}. ${STYLE} Standing, facing the viewer, neutral gentle smile, relaxed pose.`;
+  return `Using image 0 as reference, turn ${subject}.${detailsClause(details)} ${STYLE} Standing, facing the viewer, neutral gentle smile, relaxed pose.`;
 }
 
 const FRAMES = {
@@ -51,6 +67,7 @@ const FRAMES = {
 export type FrameId = keyof typeof FRAMES;
 export const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
 
-export function framePrompt(id: FrameId): string {
-  return `Redraw the cartoon character from image 0. ${FRAMES[id]} ${GESTURE_NOTE} ${STYLE}`;
+export function framePrompt(id: FrameId, details = ''): string {
+  const keep = details ? ` Keep these features exactly as described: "${details}".` : '';
+  return `Redraw the cartoon character from image 0. ${FRAMES[id]}${keep} ${GESTURE_NOTE} ${STYLE}`;
 }

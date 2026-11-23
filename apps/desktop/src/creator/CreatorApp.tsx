@@ -49,6 +49,7 @@ export function CreatorApp() {
   const [subject, setSubject] = useState<RawImage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [style, setStyle] = useState<Style>('cartoon');
+  const [details, setDetails] = useState('');
   const session = useSession();
 
   useEffect(() => () => remover.dispose(), []);
@@ -62,7 +63,13 @@ export function CreatorApp() {
     setStep({ kind: 'drawing', progress: null });
     try {
       const pet = await cartoonGenerator.generate(
-        { name, kind, consentConfirmed: kind === 'person' ? consent : false, photo: photo.bitmap },
+        {
+          name,
+          kind,
+          consentConfirmed: kind === 'person' ? consent : false,
+          photo: photo.bitmap,
+          details,
+        },
         (progress) => setStep({ kind: 'drawing', progress }),
       );
       setStep({ kind: 'review', pet, url: URL.createObjectURL(pet.sprite) });
@@ -191,6 +198,22 @@ export function CreatorApp() {
               ? 'Redraws your photo as a cartoon character with 18 expressions and poses — laughs, blushes, sulks, waves, sleeps. Free (uses a daily free allowance, about 4 pets a day). Takes a few minutes; your photo is sent once to the drawing service and not stored.'
               : 'Animates your actual photo with the background removed. Free, works offline, and the photo never leaves this computer.'}
           </p>
+          {style === 'cartoon' && (
+            <>
+              <h2>Describe your pet (optional)</h2>
+              <textarea
+                className="details"
+                maxLength={200}
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder="e.g. long wavy brown hair, round glasses, red hoodie, big smile"
+              />
+              <p className="muted small">
+                Anything the drawing should get right — it wins over the photo where they differ.
+                {details.length > 0 && ` ${details.length}/200`}
+              </p>
+            </>
+          )}
           {needsSignIn && session === null && (
             <SignIn reason="Cartoon pets are drawn by a free AI service shared by everyone in DeskPals, so they need a (free) sign-in. Up to 4 a day each." />
           )}
@@ -252,10 +275,24 @@ export function CreatorApp() {
           <div className="review checker">
             <img src={step.url} alt={step.pet.manifest.name} />
           </div>
+          {step.pet.manifest.style === 'stylized' && (
+            <>
+              <p className="muted small" style={{ marginTop: 12 }}>
+                Not quite right? Change the description and redraw (uses one of today&apos;s pets).
+              </p>
+              <textarea
+                className="details"
+                maxLength={200}
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder="e.g. long wavy brown hair, round glasses, red hoodie"
+              />
+            </>
+          )}
           {error && <p className="error">{error}</p>}
           <div className="actions">
             {step.pet.manifest.style === 'stylized' ? (
-              <button onClick={() => void drawCartoon()}>Draw again</button>
+              <button onClick={() => void drawCartoon()}>🎨 Redraw</button>
             ) : (
               <button onClick={() => setStep({ kind: 'adjust' })}>Back</button>
             )}

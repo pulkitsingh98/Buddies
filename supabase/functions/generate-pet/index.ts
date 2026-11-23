@@ -5,7 +5,7 @@
 // Images come back on a green screen; the app removes the background on-device.
 // Requires a signed-in user and spends their daily quota. The photo is never stored.
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { characterPrompt, FRAME_IDS, framePrompt, type FrameId } from './prompts.ts';
+import { characterPrompt, cleanDetails, FRAME_IDS, framePrompt, type FrameId } from './prompts.ts';
 
 const MODEL = Deno.env.get('CF_IMAGE_MODEL') ?? '@cf/black-forest-labs/flux-2-klein-4b';
 const MAX_INPUT_BYTES = 6 * 1024 * 1024;
@@ -22,9 +22,10 @@ const json = (status: number, body: unknown) =>
     headers: { ...cors, 'Content-Type': 'application/json' },
   });
 
-type Body =
+type Body = (
   | { mode: 'character'; kind: string; photo: string }
-  | { mode: 'frame'; frame: string; reference: string };
+  | { mode: 'frame'; frame: string; reference: string }
+) & { details?: string };
 
 /** Decodes a base64 data URL of a PNG/JPEG/WebP within the size limit. */
 function decodeImage(dataUrl: unknown): Blob | null {
@@ -73,12 +74,12 @@ Deno.serve(async (req) => {
   if (body.mode === 'character') {
     if (!['person', 'animal', 'object'].includes(body.kind))
       return json(400, { error: 'bad kind' });
-    prompt = characterPrompt(body.kind);
+    prompt = characterPrompt(body.kind, cleanDetails(body.details));
     image = decodeImage(body.photo);
     quotaKind = 'character';
   } else if (body.mode === 'frame') {
     if (!FRAME_IDS.includes(body.frame as FrameId)) return json(400, { error: 'unknown frame' });
-    prompt = framePrompt(body.frame as FrameId);
+    prompt = framePrompt(body.frame as FrameId, cleanDetails(body.details));
     image = decodeImage(body.reference);
     quotaKind = 'frame';
   } else {
