@@ -40,6 +40,7 @@ Full product spec lives in `docs/spec.md`; decisions and dependency justificatio
 
 - macOS transparent windows require `app.macOSPrivateApi: true` (set) and the `macos-private-api` cargo feature (set).
 - Windows: WebView2 bootstrapper is embedded in the NSIS installer; Desktop path must come from Known Folders (OneDrive redirection).
+- Windows: any Tauri command that creates a window (directly or via `pet_windows::reconcile`) must be `async` — a sync command deadlocks WebView2 and the new window stays blank white.
 - Updater: pubkey in `tauri.conf.json`; private key lives at `~/.tauri/deskpals-updater.key` on the dev Mac and in the `TAURI_SIGNING_PRIVATE_KEY` GitHub secret. Never commit it.
 
 ## Status
