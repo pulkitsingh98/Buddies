@@ -295,12 +295,13 @@ function FriendRow({ friend, online }: { friend: Friend; online: boolean }) {
     };
   }, [friend.avatar_pet_id]);
 
-  async function act(kind: 'visit' | 'nudge' | 'heart' | 'message') {
+  async function act(kind: 'visit' | 'nudge' | 'heart' | 'message' | 'hangout_invite') {
     setStatus(null);
     try {
       if (kind === 'message' && !text.trim()) return;
-      const pet = kind === 'visit' ? await visitingPetId() : null;
-      if (kind === 'visit' && !pet) throw new Error('Make a pet first — it does the visiting!');
+      const needsPet = kind === 'visit' || kind === 'hangout_invite';
+      const pet = needsPet ? await visitingPetId() : null;
+      if (needsPet && !pet) throw new Error('Make a pet first — it does the visiting!');
       await send(
         friend.user_id,
         kind,
@@ -314,6 +315,7 @@ function FriendRow({ friend, online }: { friend: Friend; online: boolean }) {
         nudge: 'Nudged! 👉',
         heart: 'Sent some love 💕',
         message: 'Sent!',
+        hangout_invite: `Invited! If ${friend.display_name} says yes, your pets will play together 🎈`,
       }[kind];
       setStatus({ ok: true, text: done });
       if (kind === 'visit' || kind === 'message') setText('');
@@ -388,6 +390,13 @@ function FriendRow({ friend, online }: { friend: Friend; online: boolean }) {
             </button>
             <button onClick={() => void act('nudge')}>👉 Nudge</button>
             <button onClick={() => void act('heart')}>💕 Heart</button>
+            <button
+              disabled={!online}
+              title={online ? '' : 'Both of you need to be online'}
+              onClick={() => void act('hangout_invite')}
+            >
+              🎈 Hang out
+            </button>
           </div>
           {status && <p className={status.ok ? 'ok small' : 'error small'}>{status.text}</p>}
           <div className="buttons" style={{ marginTop: 10 }}>

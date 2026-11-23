@@ -30,6 +30,24 @@ export const EVENTS = {
   refresh: 'social://refresh',
 } as const;
 
+/** Local coordination between a visiting pet and your own pet during a hang-out. */
+export const HANGOUT = {
+  where: 'hangout://where',
+  here: 'hangout://here',
+  move: 'hangout://move',
+  start: 'hangout://start',
+  end: 'hangout://end',
+} as const;
+export type HangoutMove = 'jump' | 'hearts' | 'wave' | 'laugh' | 'tag';
+/** Own pet's window position (logical px), for the visitor to stand next to it. */
+export interface PetSpot {
+  x: number;
+  y: number;
+  width: number;
+}
+/** An accepted hang-out invite carries this body. */
+export const HANGOUT_ACCEPT = 'accept';
+
 function client() {
   if (!supabase) throw new Error('Not connected to the server.');
   return supabase;

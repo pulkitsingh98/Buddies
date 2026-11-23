@@ -9,7 +9,16 @@ import {
 } from '@tauri-apps/api/window';
 import { ipc, type Settings } from '../lib/ipc';
 import { forwardErrors } from '../lib/log';
-import { EVENTS, send, type IncomingEvent } from '../lib/social';
+import {
+  EVENTS,
+  HANGOUT,
+  HANGOUT_ACCEPT,
+  send,
+  visitingPetId,
+  type HangoutMove,
+  type IncomingEvent,
+  type PetSpot,
+} from '../lib/social';
 import {
   CHORES_DONE,
   choresPetName,
@@ -159,7 +168,9 @@ async function main() {
       : geom.minX + Math.random() * (geom.maxX - geom.minX),
   );
   if (saved) behavior.lift = Math.min(geom.maxLift, Math.max(0, saved.lift));
-  const applyConfig = () => behavior.setConfig(behaviorConfig(settings, focus.phase === 'focus'));
+  let hangingOut = false;
+  const applyConfig = () =>
+    behavior.setConfig(behaviorConfig(settings, focus.phase === 'focus' || hangingOut));
 
   // Only the first pet that's out runs reminders and the focus timer, so they don't double up.
   const isPrimary = () => settings.activePets[0] === petId;
@@ -775,10 +786,101 @@ async function main() {
         }
         break;
       }
+      case 'hangout_invite':
+        react('greet');
+        ask(
+          `${name} wants to hang out! 🎈 Your pets can play together for 10 minutes.`,
+          [
+            {
+              label: 'Yes! 🎉',
+              onClick: () =>
+                void (async () => {
+                  const pet = await visitingPetId();
+                  await send(it.sender_id, 'hangout_invite', HANGOUT_ACCEPT, pet ?? undefined);
+                  await ipc.spawnVisitor(it.id);
+                })().catch((err: unknown) =>
+                  say(err instanceof Error ? err.message : String(err), 4000),
+                ),
+            },
+            { label: 'Not now', onClick: () => {} },
+          ],
+          60_000,
+        );
+        break;
       default:
         break;
     }
     wake();
+  });
+
+  // --- hang-out: a friend's pet is visiting and wants to play with this one ---
+  void listen(HANGOUT.where, () => {
+    if (!isPrimary()) return;
+    void emit(HANGOUT.here, {
+      x: Math.round(behavior.x),
+      y: Math.round(geom.floorTop - behavior.lift),
+      width: window.innerWidth,
+    } satisfies PetSpot);
+  });
+  void listen(HANGOUT.start, () => {
+    if (!isPrimary()) return;
+    hangingOut = true;
+    applyConfig();
+    if (behavior.state === 'sleep') behavior.dispatch({ type: 'pet' });
+    wake();
+  });
+  void listen(HANGOUT.end, () => {
+    hangingOut = false;
+    applyConfig();
+  });
+  void listen<{ move: HangoutMove; dir: 1 | -1 }>(HANGOUT.move, (e) => {
+    if (!isPrimary()) return;
+    interacted();
+    switch (e.payload.move) {
+      case 'jump':
+        behavior.dispatch({ type: 'celebrate' });
+        break;
+      case 'hearts':
+        view.addHearts(5);
+        react('hover');
+        break;
+      case 'wave':
+        react('greet');
+        break;
+      case 'laugh':
+        react('click');
+        break;
+      case 'tag':
+        // Turn to look at where the visitor ran off to.
+        behavior.dir = e.payload.dir;
+        react('nudge');
+        break;
+    }
+    wake();
+  });
+
+  // --- updates: the pet tells you when a new version is ready ---
+  void listen<string>('update://available', (e) => {
+    if (!isPrimary()) return;
+    const key = 'deskpals:update-asked';
+    const day = new Date().toDateString();
+    if (localStorage.getItem(key) === day) return;
+    localStorage.setItem(key, day);
+    react('greet');
+    ask(
+      `A new version of DeskPals (v${e.payload}) is ready ✨`,
+      [
+        {
+          label: 'Update now',
+          onClick: () => {
+            say('Updating… see you in a moment! 👋', 10_000);
+            void ipc.installUpdate().catch((err: unknown) => say(String(err), 5000));
+          },
+        },
+        { label: 'Later', onClick: () => {} },
+      ],
+      120_000,
+    );
   });
 
   // --- chores: celebrate a tidy, and now and then offer one ---

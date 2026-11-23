@@ -47,7 +47,8 @@ Full product spec lives in `docs/spec.md`; decisions and dependency justificatio
 - Phase 1 (pet on desktop): done — photo cutout + cartoon (FLUX.2 on Cloudflare free tier) pets, expressions, click-through.
 - Phase 2 (wellbeing): done — reminders, focus timer, daily message, compliments, mood check-in (src/pet/wellbeing.ts, focus.ts, messages.ts). Delivered only by the first active pet.
 - Phase 3 (social): done — friends by code, presence, visits/nudges/hearts/messages, offline queue, DND, block, rate limits. Hidden `social` window owns the realtime connection (src/social/main.ts) and talks to other windows via `social://*` events; visitor windows are `visit-<interaction id>`. `scripts/e2e-social.mjs` runs against a local stack in CI.
-- Settings live in `settings.json`; wellbeing counters in `wellbeing.json` (both in the app config dir). SQLite comes with the Phase 4 undo log.
+- Phase 4 (chores & polish): done — tidy/sort with preview + SQLite undo log (src-tauri/src/chores.rs), quick create, hang-out mode (src/pet/visitor.ts + `hangout://` events), onboarding, launch at login, background update checks (src-tauri/src/updates.rs). Mood check-in is a decision tree (src/pet/moods.ts) shared via `share_mood()`.
+- Settings live in `settings.json`; wellbeing counters in `wellbeing.json` (both in the app config dir). The undo log is SQLite (`deskpals.db`, rusqlite).
 
 - Phase 0 (foundations): done — v0.1.0 released with universal .dmg + x64 NSIS installer + signed latest.json. Pending: manual install QA on both OSes, hosted Supabase link + `db push`.
 - Supabase project ref: `fbsmbgptbkrgmarxctih` (ap-northeast-2).

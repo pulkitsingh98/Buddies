@@ -34,3 +34,19 @@
   Pollinations (free tier is text-to-image only, no reference editing); HF Spaces (unreliable queues).
 - **Quota**: 4 pets and 90 frames per user per day (`consume_generation_quota`), which also keeps the
   shared Cloudflare allowance from being drained by one person.
+
+## 2026-11-23 — Phase 4
+
+- **SQLite via `rusqlite` (bundled), not the Tauri SQL plugin.** The file-move undo log has to be written
+  by the same Rust code that moves the files (each move logged as it happens, so a partial tidy is still
+  undoable and testable on temp dirs). The SQL plugin is only reachable from JS. Settings and wellbeing
+  counters stay as small JSON files; the database holds the 30-day move history (`deskpals.db`).
+- **Files in use**: Windows checks for a sharing lock; macOS has no cheap equivalent, so files modified in
+  the last 30 seconds are skipped.
+- **Hang-out choreography is local**: each screen hosts the other's pet, and the visitor coordinates with
+  your own pet over local Tauri events (`hangout://*`). No cross-machine sync is needed for the simple
+  paired animations, so no Realtime Broadcast traffic.
+- **Mood sharing** is its own interaction type (`mood`) sent to all friends by `share_mood()`, at most once
+  per 30 minutes; the latest mood also shows in the friends list.
+- **Updates**: checked in the background (1 min after launch, then every 6 h) against GitHub Releases; the
+  pet asks before installing.

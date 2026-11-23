@@ -94,6 +94,7 @@ export const ipc = {
   openSettings: () => invoke('open_settings'),
   openFriends: () => invoke('open_friends'),
   openChores: () => invoke('open_chores'),
+  installUpdate: () => invoke('install_update'),
   tidyPreview: (folderId: ChoreFolder, petName: string, date: string) =>
     invoke<TidyPlan>('chores_preview', { folderId, petName, date }),
   tidyApply: (folderId: ChoreFolder, petName: string, date: string) =>

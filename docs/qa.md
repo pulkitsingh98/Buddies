@@ -50,3 +50,18 @@ Run on **both** macOS and Windows for every release. Tick each box per OS.
 | Quit the app on one side, send a visit, reopen → it arrives                       | ☐     | ☐       |
 | Do Not Disturb holds visits; turning it off delivers them                         | ☐     | ☐       |
 | Block: the blocked side's sends silently do nothing                               | ☐     | ☐       |
+
+## Phase 4 — Chores, hang-out, onboarding, updates
+
+| Check                                                                                          | macOS | Windows |
+| ---------------------------------------------------------------------------------------------- | ----- | ------- |
+| First launch shows onboarding; finishing it opens the pet creator                              | ☐     | ☐       |
+| Chores: enable Desktop (macOS asks for access) → Preview lists files by category               | ☐     | ☐       |
+| Tidy → files land in "Tidied by <pet>/<date>/…", pet celebrates with Undo                      | ☐     | ☐       |
+| Undo → every file is back where it was; empty tidy folders are gone                            | ☐     | ☐       |
+| Open files / partial downloads / folders / shortcuts are left alone                            | ☐     | ☐       |
+| Quick folder and quick note appear on the Desktop (no overwrite)                               | ☐     | ☐       |
+| Hang out (both online): each pet appears next to the other's and they play                     | ☐     | ☐       |
+| Mood check-in: follow-up questions work; breathing exercise; friend is told when sharing is on | ☐     | ☐       |
+| Launch at login toggle works                                                                   | ☐     | ☐       |
+| Older version shows "new version ready" bubble; Update now installs and restarts               | ☐     | ☐       |

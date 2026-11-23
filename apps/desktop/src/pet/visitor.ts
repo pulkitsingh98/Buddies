@@ -1,8 +1,13 @@
 /**
- * A friend's pet visiting this screen (window label `visit-<interaction id>`): it walks in from
- * a screen edge, says the friend's message (with Reply / wave-back buttons), then waves and walks
- * off, and the window closes itself.
+ * A friend's pet on this screen (window label `visit-<interaction id>`).
+ *
+ * - Visit: walks in from a screen edge, says the friend's message (Reply / wave back), then
+ *   waves and walks off, and the window closes itself.
+ * - Hang-out (an accepted `hangout_invite`): walks up next to your own pet and the two play
+ *   together for ten minutes — jumping, swapping hearts, waving, laughing, a game of tag —
+ *   coordinated with your pet over local `hangout://` events.
  */
+import { emit, listen } from '@tauri-apps/api/event';
 import {
   currentMonitor,
   getCurrentWindow,
@@ -11,13 +16,49 @@ import {
 } from '@tauri-apps/api/window';
 import { MESSAGE_MAX_LEN } from '@deskpals/shared';
 import { ipc } from '../lib/ipc';
-import { friendPet, listFriends, markDelivered, send } from '../lib/social';
+import {
+  friendPet,
+  HANGOUT,
+  listFriends,
+  markDelivered,
+  send,
+  type HangoutMove,
+  type PetSpot,
+} from '../lib/social';
 import { supabase } from '../lib/supabase';
-import { Expressions } from './expressions';
+import { Expressions, type Reaction } from './expressions';
 import { MASK_COLS, MASK_ROWS, PetView } from './view';
 
-const STAY_MS = 30_000;
+const VISIT_MS = 30_000;
+const HANGOUT_MS = 10 * 60_000;
 const SPEED = 110; // px/s
+const PLAY_LINES: Record<HangoutMove, string[]> = {
+  jump: ['Wheee! 🎉', 'Jump with me!', 'Boing boing!'],
+  hearts: ['Best friends 💕', 'Love you, buddy!'],
+  wave: ['Hiii! 👋', 'Hello there!'],
+  laugh: ['Hahaha 😆', 'You’re so funny!'],
+  tag: ["Tag, you're it! 🏃", 'Catch me!'],
+};
+
+/** Asks your own pet where it is (for hang-outs). */
+async function ownPetSpot(): Promise<PetSpot | null> {
+  return new Promise((resolve) => {
+    let done = false;
+    void listen<PetSpot>(HANGOUT.here, (e) => {
+      if (!done) {
+        done = true;
+        resolve(e.payload);
+      }
+    });
+    void emit(HANGOUT.where);
+    window.setTimeout(() => {
+      if (!done) {
+        done = true;
+        resolve(null);
+      }
+    }, 1200);
+  });
+}
 
 export async function runVisitor() {
   const win = getCurrentWindow();
@@ -31,6 +72,7 @@ export async function runVisitor() {
     if (it) await markDelivered(id, true);
     return close();
   }
+  const hangout = it.type === 'hangout_invite';
   const friends = await listFriends().catch(() => []);
   const name = friends.find((f) => f.user_id === it.sender_id)?.display_name ?? 'A friend';
   const settings = await ipc.getSettings();
@@ -39,6 +81,12 @@ export async function runVisitor() {
   const view = new PetView(sprite, URL.createObjectURL(pet.sprite), pet.manifest);
   view.layout(settings.petSize);
   const expr = view.frameIds.size > 1 ? new Expressions(view.frameIds) : null;
+  const t0 = performance.now();
+  const now = () => (performance.now() - t0) / 1000;
+  const react = (kind: Reaction) => {
+    expr?.react(kind, now());
+    view.pop();
+  };
 
   let lastMask = '';
   const sendMask = () => {
@@ -51,23 +99,36 @@ export async function runVisitor() {
   };
   view.onMaskChange = sendMask;
 
-  // Walk in from the left or right edge of the work area.
+  // Geometry: walk in from a screen edge, to a spot (next to your pet when hanging out).
   const m = (await currentMonitor()) ?? (await primaryMonitor());
   const W = window.innerWidth;
   const H = window.innerHeight;
   const sf = m?.scaleFactor ?? 1;
   const left = (m?.workArea.position.x ?? 0) / sf;
   const width = (m?.workArea.size.width ?? 1200) / sf;
-  const floorTop = ((m?.workArea.position.y ?? 0) + (m?.workArea.size.height ?? 800)) / sf - H;
-  const fromLeft = Math.random() < 0.5;
+  let y = ((m?.workArea.position.y ?? 0) + (m?.workArea.size.height ?? 800)) / sf - H;
+  let fromLeft = Math.random() < 0.5;
+  let spot = fromLeft ? left + width * 0.2 : left + width * 0.8 - W;
+  let host: PetSpot | null = null;
+  if (hangout) {
+    host = await ownPetSpot();
+    if (host) {
+      y = host.y;
+      // Come in from the nearer side and stand right next to the host pet.
+      fromLeft = host.x - left < width / 2;
+      spot = fromLeft ? host.x - W * 0.55 : host.x + host.width * 0.55;
+      void emit(HANGOUT.start);
+    }
+  }
   const outside = fromLeft ? left - W : left + width;
-  const spot = fromLeft ? left + width * 0.2 : left + width * 0.8 - W;
 
   let x = outside;
-  let phase: 'enter' | 'talk' | 'leave' = 'enter';
+  let phase: 'enter' | 'stay' | 'leave' = 'enter';
   let target = spot;
   let leaveAt = 0;
-  const t0 = performance.now();
+  let nextPlay = 0;
+
+  const setPos = () => void win.setPosition(new LogicalPosition(Math.round(x), Math.round(y)));
 
   const replyTo = async () => {
     await win.setFocusable(true).catch(() => {});
@@ -91,16 +152,22 @@ export async function runVisitor() {
     );
   };
 
-  const talk = () => {
-    phase = 'talk';
-    leaveAt = performance.now() + STAY_MS;
+  const arrive = () => {
+    phase = 'stay';
     void markDelivered(id, true);
     view.setState('idle', false, settings.reducedMotion);
-    expr?.react('greet', performance.now() / 1000);
-    view.pop();
+    react('greet');
+    if (hangout) {
+      leaveAt = performance.now() + HANGOUT_MS;
+      nextPlay = performance.now() + 3000;
+      view.showBubble(`${name}'s pet came to play! 🎈`, { ms: 4000 });
+      void emit(HANGOUT.move, { move: 'wave', dir: fromLeft ? -1 : 1 });
+      return;
+    }
+    leaveAt = performance.now() + VISIT_MS;
     const text = it.body ? `${name}: “${it.body}”` : `${name} sent me to say hi! 👋`;
     view.showBubble(text, {
-      ms: STAY_MS,
+      ms: VISIT_MS,
       actions: [
         { label: 'Reply', onClick: () => void replyTo() },
         {
@@ -108,7 +175,7 @@ export async function runVisitor() {
           onClick: () => {
             void send(it.sender_id, 'heart').catch(() => {});
             view.addHearts();
-            expr?.react('hover', performance.now() / 1000);
+            react('hover');
             leaveAt = performance.now() + 2500;
           },
         },
@@ -117,57 +184,100 @@ export async function runVisitor() {
     });
   };
 
+  /** One round of play with the host pet (hang-outs). */
+  const play = () => {
+    const moves: HangoutMove[] = ['jump', 'hearts', 'wave', 'laugh', 'tag'];
+    const move = moves[Math.floor(Math.random() * moves.length)] ?? 'wave';
+    const lines = PLAY_LINES[move];
+    if (Math.random() < 0.5)
+      view.showBubble(lines[Math.floor(Math.random() * lines.length)] ?? '', { ms: 2500 });
+    switch (move) {
+      case 'jump':
+        view.setState('celebrate', false, settings.reducedMotion);
+        expr?.hold('celebrate', now(), 2.2);
+        window.setTimeout(() => view.setState('idle', false, settings.reducedMotion), 2400);
+        break;
+      case 'hearts':
+        view.addHearts(6);
+        react('hover');
+        break;
+      case 'wave':
+        react('greet');
+        break;
+      case 'laugh':
+        react('click');
+        break;
+      case 'tag': {
+        // Run to the other side of the host pet; it turns to look.
+        if (host) {
+          const otherSide = x < host.x ? host.x + host.width * 0.55 : host.x - W * 0.55;
+          target = Math.min(left + width - W * 0.8, Math.max(left - W * 0.2, otherSide));
+          phase = 'enter';
+        }
+        break;
+      }
+    }
+    void emit(HANGOUT.move, { move, dir: target > x ? 1 : -1 });
+  };
+
   const leave = () => {
     phase = 'leave';
     target = outside;
-    expr?.react('greet', performance.now() / 1000);
+    react('greet');
+    if (hangout) {
+      view.showBubble('Bye! That was fun 🎈', { ms: 2500 });
+      void emit(HANGOUT.move, { move: 'wave', dir: fromLeft ? -1 : 1 });
+      void emit(HANGOUT.end);
+    }
     window.setTimeout(() => view.setState('walk', false, settings.reducedMotion), 900);
   };
 
   // Click the visitor: hearts and a happy face.
   view.target.addEventListener('click', () => {
     view.addHearts();
-    expr?.react('click', performance.now() / 1000);
-    view.pop();
+    react('click');
   });
 
   view.setState('walk', false, settings.reducedMotion);
-  void win.setPosition(new LogicalPosition(Math.round(x), Math.round(floorTop)));
+  setPos();
   await win.show();
 
   let last = performance.now();
   const frame = () => {
-    const now = performance.now();
-    const dt = Math.min(0.1, (now - last) / 1000);
-    last = now;
-    if (phase === 'enter' || phase === 'leave') {
+    const t = performance.now();
+    const dt = Math.min(0.1, (t - last) / 1000);
+    last = t;
+    const moving = phase === 'enter' || phase === 'leave';
+    if (moving) {
       const dir = Math.sign(target - x) || 1;
-      x += dir * Math.min(Math.abs(target - x), SPEED * dt);
+      x += dir * Math.min(Math.abs(target - x), SPEED * dt * (hangout && leaveAt ? 1.6 : 1));
       view.setFlip(dir < 0);
-      void win.setPosition(new LogicalPosition(Math.round(x), Math.round(floorTop)));
+      setPos();
       if (Math.abs(target - x) < 0.5) {
-        if (phase === 'enter') talk();
-        else return close();
+        if (phase === 'leave') return close();
+        if (leaveAt === 0) arrive();
+        else {
+          phase = 'stay'; // finished a game of tag
+          view.setState('idle', false, settings.reducedMotion);
+          react('click');
+        }
       }
-    } else if (phase === 'talk' && now >= leaveAt && !view.bubbleOpen) {
-      leave();
-    } else if (phase === 'talk' && now >= leaveAt + 1000) {
-      leave();
+    } else if (phase === 'stay') {
+      if (t >= leaveAt && (!view.bubbleOpen || t >= leaveAt + 1000)) leave();
+      else if (hangout && t >= nextPlay && !view.bubbleOpen) {
+        play();
+        nextPlay = t + 6000 + Math.random() * 6000;
+      }
     }
     if (expr) {
       const f = expr.frame(
-        {
-          state: phase === 'talk' ? 'idle' : 'walk',
-          sleepy: false,
-          sinceInteraction: 0,
-          userIdle: 0,
-        },
-        (now - t0) / 1000,
+        { state: moving ? 'walk' : 'idle', sleepy: false, sinceInteraction: 0, userIdle: 0 },
+        now(),
       );
       if (view.setFrame(f)) sendMask();
     }
     sendMask();
-    window.setTimeout(frame, phase === 'talk' ? 125 : 33);
+    window.setTimeout(frame, moving ? 33 : 125);
   };
   frame();
 }

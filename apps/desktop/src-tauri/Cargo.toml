@@ -30,7 +30,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 sha2 = "0.10"
 # The file-move undo log for desktop chores (owned by Rust so moves and log stay in step).
 rusqlite = { version = "0.43", features = ["bundled"] }
-tokio = { version = "1", features = ["fs", "io-util"] }
+tokio = { version = "1", features = ["fs", "io-util", "time"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

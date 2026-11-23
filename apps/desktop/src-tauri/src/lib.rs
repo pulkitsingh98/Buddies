@@ -6,6 +6,7 @@ mod pets;
 mod settings;
 mod system;
 mod tray;
+mod updates;
 mod windows;
 
 use tauri::{Manager, RunEvent};
@@ -52,6 +53,7 @@ pub fn run() {
             windows::open_settings,
             windows::open_friends,
             windows::open_chores,
+            updates::install_update,
             chores::chores_preview,
             chores::chores_apply,
             chores::chores_undo_last,
@@ -83,6 +85,7 @@ pub fn run() {
             system::start_fullscreen_watch(app.handle().clone());
             pet_windows::reconcile(app.handle());
             windows::start_social(app.handle())?;
+            updates::start(app.handle().clone());
 
             // First run: a short welcome (which ends by making a first pet).
             if !app.state::<settings::SettingsState>().get().onboarded {

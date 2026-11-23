@@ -69,7 +69,13 @@ pub fn show_chores(app: &AppHandle) -> tauri::Result<()> {
 }
 
 pub fn show_onboarding(app: &AppHandle) -> tauri::Result<()> {
-    show(app, ONBOARDING, "onboarding.html", "Welcome to DeskPals", (560.0, 640.0))
+    show(
+        app,
+        ONBOARDING,
+        "onboarding.html",
+        "Welcome to DeskPals",
+        (560.0, 640.0),
+    )
 }
 
 #[tauri::command]

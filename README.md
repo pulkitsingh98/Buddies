@@ -2,6 +2,14 @@
 
 Turn a photo of a person, pet or object into a little animated buddy that lives on your desktop, reminds you to drink water and stretch, tidies your files, and visits your friends' screens.
 
+**What it does**
+
+- 🎨 **Pets from photos** — a cartoon character with 18 expressions (free AI drawing), or the photo itself cut out on-device.
+- 🐾 **Lives on your desktop** — walks, sits, sleeps when you're away, reacts to clicks, hovers and shakes; drop it anywhere.
+- 💧 **Looks after you** — water, stretch and eye-break reminders, a focus timer, a kind message each morning, mood check-ins with follow-up questions and a guided breathing exercise.
+- 👫 **Friends** — add by friend code; send your pet to visit with a message, nudge, send hearts, message, hang out so your pets play together, and see when friends are online or feeling down.
+- 🧹 **Chores** — tidy your Desktop or Downloads into dated folders (preview first, one-click undo, never deletes), quick folders and notes.
+
 macOS + Windows · Tauri v2 · React · Supabase
 
 ---

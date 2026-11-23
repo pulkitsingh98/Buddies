@@ -10,6 +10,7 @@ import { ipc, type Settings } from '../lib/ipc';
 import { forwardErrors } from '../lib/log';
 import {
   EVENTS,
+  HANGOUT_ACCEPT,
   listFriends,
   markDelivered,
   myProfile,
@@ -53,7 +54,7 @@ async function deliver(it: Interaction) {
   if ((await ipc.petsOut().catch(() => 0)) === 0) return;
   delivering.add(it.id);
   try {
-    if (it.type === 'visit') {
+    if (it.type === 'visit' || (it.type === 'hangout_invite' && it.body === HANGOUT_ACCEPT)) {
       // The visitor window marks it delivered/seen itself once it has walked in.
       await ipc.spawnVisitor(it.id);
     } else {
