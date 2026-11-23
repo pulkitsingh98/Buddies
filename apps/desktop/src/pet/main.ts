@@ -1,6 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import {
   currentMonitor,
+  cursorPosition,
   getCurrentWindow,
   LogicalPosition,
   primaryMonitor,
@@ -8,9 +9,28 @@ import {
 import { ipc, type Settings } from '../lib/ipc';
 import { forwardErrors } from '../lib/log';
 import { Behavior, type BehaviorConfig, type PetState } from './behavior';
-import { Expressions } from './expressions';
+import { Expressions, type Reaction } from './expressions';
+import { FocusTimer } from './focus';
+import {
+  COMPLIMENTS,
+  EYE_LINES,
+  GOOD_MESSAGES,
+  MOODS,
+  pick,
+  REACTIONS,
+  STRETCH_TIPS,
+  WATER_LINES,
+} from './messages';
 import { tickHz } from './pose';
-import { MASK_COLS, MASK_ROWS, PetView } from './view';
+import { MASK_COLS, MASK_ROWS, PetView, type BubbleAction } from './view';
+import {
+  emptyState,
+  localDay,
+  Wellbeing,
+  type Prompt,
+  type WellbeingConfig,
+  type WellbeingState,
+} from './wellbeing';
 
 const win = getCurrentWindow();
 const petId = win.label.slice('pet-'.length);
@@ -28,12 +48,28 @@ interface Geometry {
   floorTop: number;
 }
 
-function behaviorConfig(s: Settings): BehaviorConfig {
+function behaviorConfig(s: Settings, stayPut: boolean): BehaviorConfig {
   return {
     sleepAfterSec: s.sleepAfterMin * 60,
     bedtimeHour: s.bedtimeHour,
     reducedMotion: s.reducedMotion,
     walkSpeed: Math.max(30, s.petSize * 0.35),
+    stayPut,
+  };
+}
+
+function wellbeingConfig(s: Settings): WellbeingConfig {
+  return {
+    reminders: {
+      water: { enabled: s.waterEnabled, everyMin: s.waterEveryMin },
+      stretch: { enabled: s.stretchEnabled, everyMin: s.stretchEveryMin },
+      eye: { enabled: s.eyeEnabled, everyMin: s.eyeEveryMin },
+    },
+    quietStart: s.quietStart,
+    quietEnd: s.quietEnd,
+    dailyMessage: s.dailyMessage,
+    compliments: s.compliments,
+    moodCheckin: s.moodCheckin,
   };
 }
 
@@ -51,11 +87,14 @@ async function geometry(): Promise<Geometry> {
   return { minX: left - w * 0.2, maxX: left + width - w * 0.8, floorTop: top + height - h };
 }
 
+const yesterday = () => localDay(new Date(Date.now() - 86_400_000));
+
 async function main() {
-  const [manifest, spriteBlob, initialSettings] = await Promise.all([
+  const [manifest, spriteBlob, initialSettings, savedWellbeing] = await Promise.all([
     ipc.getPet(petId),
     ipc.getPetSprite(petId),
     ipc.getSettings(),
+    ipc.getWellbeingState().catch(() => null),
   ]);
   let settings = initialSettings;
   const sprite = await createImageBitmap(spriteBlob);
@@ -63,10 +102,24 @@ async function main() {
   view.layout(settings.petSize);
 
   let geom = await geometry();
+  const focus = new FocusTimer();
   const behavior = new Behavior(
-    behaviorConfig(settings),
+    behaviorConfig(settings, false),
     geom.minX + Math.random() * (geom.maxX - geom.minX),
   );
+  const applyConfig = () => behavior.setConfig(behaviorConfig(settings, focus.phase === 'focus'));
+
+  // Only the first pet that's out runs reminders and the focus timer, so they don't double up.
+  const isPrimary = () => settings.activePets[0] === petId;
+  const wellbeing = new Wellbeing(
+    wellbeingConfig(settings),
+    (savedWellbeing as WellbeingState | null) ?? emptyState(localDay(new Date())),
+  );
+  let saveTimer: number | undefined;
+  const saveWellbeing = () => {
+    clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => void ipc.setWellbeingState(wellbeing.state), 1000);
+  };
 
   // Cartoon pets have many drawn expressions; cutout pets have one frame.
   const expr =
@@ -75,9 +128,36 @@ async function main() {
       : null;
   let lastInteraction = performance.now();
   const interacted = () => (lastInteraction = performance.now());
-  // Shake detection while dragging: several quick direction reversals.
-  let lastVelSign = 0;
-  let reversals: number[] = [];
+
+  // --- speech: tasks (reminders, questions) are never overwritten by chit-chat ---
+  let bubbleIsTask = false;
+  const say = (text: string, ms = 3000) => {
+    if (view.bubbleOpen && bubbleIsTask) return;
+    bubbleIsTask = false;
+    view.showBubble(text, { ms });
+  };
+  const ask = (text: string, actions: BubbleAction[], ms: number, onTimeout?: () => void) => {
+    bubbleIsTask = true;
+    view.showBubble(text, {
+      ms,
+      actions: actions.map((a) => ({
+        ...a,
+        onClick: () => {
+          bubbleIsTask = false;
+          a.onClick();
+        },
+      })),
+      onTimeout: () => {
+        bubbleIsTask = false;
+        onTimeout?.();
+      },
+    });
+  };
+  const react = (kind: Reaction, line?: string, chance = 1) => {
+    expr?.react(kind, performance.now() / 1000);
+    view.pop();
+    if (line && Math.random() < chance) say(line);
+  };
 
   // --- click-through mask: sent whenever the clickable shape changes ---
   let lastMaskKey = '';
@@ -89,6 +169,10 @@ async function main() {
     ipc.setHitMask(MASK_COLS, MASK_ROWS, bits).catch(() => {});
   };
   view.onMaskChange = sendMask;
+
+  // Shake detection while dragging: several quick direction reversals.
+  let lastVelSign = 0;
+  let reversals: number[] = [];
 
   // --- view state follows the behaviour state ---
   let shownState: PetState | null = null;
@@ -122,7 +206,7 @@ async function main() {
         if (sign && lastVelSign && sign !== lastVelSign) {
           reversals = [...reversals.filter((t) => now - t < 1200), now];
           if (reversals.length >= 3) {
-            expr.react('shake', now / 1000);
+            react('shake', pick(REACTIONS.shake));
             reversals = [];
           }
         }
@@ -133,7 +217,7 @@ async function main() {
           state: behavior.state,
           sleepy: behavior.sleepy,
           sinceInteraction: (now - lastInteraction) / 1000,
-          userIdle: idleBase + (now - idleAt) / 1000,
+          userIdle: userIdleSec(now),
         },
         now / 1000,
       );
@@ -163,6 +247,7 @@ async function main() {
   let idleBase = 0;
   let idleAt = performance.now();
   let nextIdlePoll = 0;
+  const userIdleSec = (now: number) => idleBase + (now - idleAt) / 1000;
   const markActive = () => {
     idleBase = 0;
     idleAt = performance.now();
@@ -179,11 +264,37 @@ async function main() {
       .catch(() => {});
   };
 
+  // --- noticing the cursor: wave when it comes close after being away ---
+  let cursorFarSince = performance.now();
+  let nextCursorCheck = 0;
+  const checkCursor = (now: number) => {
+    if (now < nextCursorCheck || behavior.state === 'sleep' || behavior.state === 'drag') return;
+    nextCursorCheck = now + 500;
+    void cursorPosition()
+      .then((p) => {
+        const sf = window.devicePixelRatio || 1;
+        const cx = behavior.x + window.innerWidth / 2;
+        const cy = geom.floorTop - behavior.lift + window.innerHeight * 0.6;
+        const d = Math.hypot(p.x / sf - cx, p.y / sf - cy);
+        const t = performance.now();
+        if (d > 400) {
+          if (cursorFarSince === 0) cursorFarSince = t;
+        } else if (d < 180 && cursorFarSince && t - cursorFarSince > 20_000) {
+          cursorFarSince = 0;
+          if (behavior.state === 'idle' || behavior.state === 'sit') react('greet', 'Hi! 👋', 0.3);
+        } else if (d <= 400) {
+          cursorFarSince = 0;
+        }
+      })
+      .catch(() => {});
+  };
+
   // --- pointer: drag, click to pet, double-click to celebrate, hover to pet ---
   const target = view.target;
   let press: { sx: number; sy: number; x: number; lift: number; dragging: boolean } | null = null;
   let hoverTimer: number | undefined;
   let lastHoverPet = 0;
+  let clicks: number[] = [];
   target.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     clearTimeout(hoverTimer);
@@ -219,14 +330,21 @@ async function main() {
         behavior.lift = Math.max(0, g.floorTop - top);
       });
     } else {
+      const now = performance.now();
+      clicks = [...clicks.filter((t) => now - t < 3000), now];
       const wasAsleep = behavior.state === 'sleep';
       behavior.dispatch({ type: 'pet' });
-      if (!wasAsleep) expr?.react('click', performance.now() / 1000);
+      if (wasAsleep) say(pick(REACTIONS.wake));
+      else if (clicks.length >= 5) {
+        react('spam', pick(REACTIONS.spam));
+        clicks = [];
+      } else react('click', pick(REACTIONS.click), 0.35);
     }
     wake();
   });
   target.addEventListener('dblclick', () => {
     behavior.dispatch({ type: 'celebrate' });
+    say(pick(REACTIONS.celebrate), 2000);
     wake();
   });
   target.addEventListener('pointerenter', () => {
@@ -236,16 +354,192 @@ async function main() {
       lastHoverPet = performance.now();
       interacted();
       behavior.dispatch({ type: 'pet' });
-      expr?.react('hover', performance.now() / 1000);
+      react('hover', pick(REACTIONS.hover), 0.25);
       wake();
     }, 900);
   });
   target.addEventListener('pointerleave', () => clearTimeout(hoverTimer));
 
+  // --- wellbeing prompts (primary pet only) ---
+  const deliver = (p: Prompt) => {
+    switch (p.type) {
+      case 'reminder': {
+        const kind = p.kind;
+        const text =
+          kind === 'water'
+            ? pick(WATER_LINES)
+            : kind === 'stretch'
+              ? `Stretch time! 🙆 ${pick(STRETCH_TIPS)}`
+              : pick(EYE_LINES);
+        react('greet');
+        ask(
+          text,
+          [
+            {
+              label: kind === 'water' ? 'Done 💧' : 'Done ✓',
+              onClick: () => {
+                wellbeing.done(kind, Date.now());
+                saveWellbeing();
+                behavior.dispatch({ type: 'celebrate' });
+                say(
+                  kind === 'water'
+                    ? `Yay! ${wellbeing.state.waterGlasses} glass${wellbeing.state.waterGlasses === 1 ? '' : 'es'} today 💧`
+                    : 'Nice! Your body says thanks 🎉',
+                );
+                wake();
+              },
+            },
+            {
+              label: 'Snooze 10m',
+              onClick: () => {
+                wellbeing.snooze(kind, Date.now(), 10);
+                saveWellbeing();
+              },
+            },
+          ],
+          60_000,
+          () => {
+            wellbeing.snooze(kind, Date.now(), 15);
+            saveWellbeing();
+          },
+        );
+        break;
+      }
+      case 'goodMessage':
+        react('greet');
+        ask(pick(GOOD_MESSAGES), [{ label: '💛', onClick: () => react('hover') }], 20_000);
+        break;
+      case 'compliment':
+        react('hover', pick(COMPLIMENTS));
+        break;
+      case 'mood':
+        ask(
+          'How are you feeling today?',
+          MOODS.map((m) => ({
+            label: m.emoji,
+            onClick: () => {
+              wellbeing.setMood(m.emoji);
+              saveWellbeing();
+              react(m.emoji === '😔' || m.emoji === '😫' ? 'hover' : 'click');
+              say(m.reply, 5000);
+            },
+          })),
+          45_000,
+        );
+        break;
+    }
+    saveWellbeing();
+  };
+
+  let nextWellbeingCheck = 0;
+  let lastLonelyLine = 0;
+  const checkWellbeing = (now: number) => {
+    if (!isPrimary() || now < nextWellbeingCheck) return;
+    nextWellbeingCheck = now + 5000;
+    const d = new Date();
+    const prompt = wellbeing.next({
+      now: Date.now(),
+      hour: d.getHours(),
+      day: localDay(d),
+      userIdleSec: userIdleSec(now),
+      busy:
+        view.bubbleOpen ||
+        focus.phase === 'focus' ||
+        behavior.state === 'drag' ||
+        behavior.state === 'sleep',
+    });
+    if (prompt) deliver(prompt);
+    // Lonely: ignored for half an hour while the user is at the computer.
+    if (
+      now - lastInteraction > 30 * 60_000 &&
+      userIdleSec(now) < 60 &&
+      now - lastLonelyLine > 30 * 60_000 &&
+      !view.bubbleOpen
+    ) {
+      lastLonelyLine = now;
+      say(pick(REACTIONS.lonely), 5000);
+    }
+  };
+
+  // --- focus timer (tray "Start Focus Timer") ---
+  const startFocus = () => {
+    focus.startFocus(Date.now(), settings.focusMin);
+    applyConfig();
+    behavior.dispatch({ type: 'celebrate' });
+    say(`Focus time! I'll sit right here with you 🍅 (${settings.focusMin} min)`, 4000);
+    wake();
+  };
+  const startBreak = () => {
+    focus.startBreak(Date.now(), settings.breakMin);
+    applyConfig();
+    say(`Break time! Stretch, sip, look away 🌿 (${settings.breakMin} min)`, 5000);
+    wake();
+  };
+  const stopFocus = () => {
+    focus.stop();
+    applyConfig();
+    view.setBadge(null);
+  };
+  const updateFocus = () => {
+    const ev = focus.tick(Date.now());
+    if (ev === 'focusDone') {
+      wellbeing.focusCompleted(localDay(new Date()), yesterday());
+      saveWellbeing();
+      applyConfig();
+      behavior.dispatch({ type: 'celebrate' });
+      react('click');
+      const n = wellbeing.state.focusSessionsToday;
+      const streak = wellbeing.state.focusStreak;
+      ask(
+        `Focus session done! 🎉 ${n} today${streak > 1 ? ` · ${streak}-day streak 🔥` : ''}. Take a ${settings.breakMin}-min break?`,
+        [
+          { label: 'Start break', onClick: startBreak },
+          { label: 'Skip', onClick: () => {} },
+        ],
+        120_000,
+      );
+    } else if (ev === 'breakDone') {
+      ask(
+        "Break's over! Another round? 🍅",
+        [
+          { label: 'Start focus', onClick: startFocus },
+          { label: 'Later', onClick: () => {} },
+        ],
+        120_000,
+      );
+    }
+    if (focus.phase === 'idle' || view.bubbleOpen) view.setBadge(null);
+    else
+      view.setBadge(`${focus.phase === 'focus' ? '🍅' : '🌿'} ${focus.remaining(Date.now())}`, () =>
+        ask(
+          focus.phase === 'focus' ? 'Stop this focus session?' : 'End the break?',
+          [
+            { label: 'Stop', onClick: stopFocus },
+            { label: 'Keep going', onClick: () => {} },
+          ],
+          15_000,
+        ),
+      );
+  };
+  void listen('tray://focus', () => {
+    if (!isPrimary()) return;
+    if (focus.phase === 'idle') startFocus();
+    else
+      ask(
+        'A session is running. Stop it?',
+        [
+          { label: 'Stop', onClick: stopFocus },
+          { label: 'Keep going', onClick: () => {} },
+        ],
+        15_000,
+      );
+  });
+
   // --- settings, resize, suspension ---
   void listen<Settings>('settings://changed', (e) => {
     settings = e.payload;
-    behavior.setConfig(behaviorConfig(settings));
+    applyConfig();
+    wellbeing.cfg = wellbeingConfig(settings);
     shownState = null; // re-apply reduced-motion class
     wake();
   });
@@ -261,7 +555,7 @@ async function main() {
   });
   document.addEventListener('visibilitychange', wake);
 
-  // --- behaviour loop: fast only while the window moves; ~1 Hz at rest ---
+  // --- behaviour loop: fast only while the window moves; a few Hz at rest ---
   let timer: number | undefined;
   let last = performance.now();
   let shown = false;
@@ -282,28 +576,32 @@ async function main() {
     behavior.tick(dt, {
       minX: geom.minX,
       maxX: geom.maxX,
-      userIdleSec: idleBase + (now - idleAt) / 1000,
+      userIdleSec: userIdleSec(now),
       hour: new Date().getHours(),
     });
     for (const fx of behavior.drainEffects()) {
       if (fx === 'hearts') view.addHearts();
-      if (fx === 'bedtimeNudge')
-        view.showBubble(
-          BEDTIME_LINES[Math.floor(Math.random() * BEDTIME_LINES.length)] ?? '',
-          10000,
-        );
+      if (fx === 'land') view.pop();
+      if (fx === 'bedtimeNudge') say(pick(BEDTIME_LINES), 10_000);
     }
-    if (prevState === 'wake' && behavior.state === 'idle') expr?.react('greet', now / 1000);
+    if (prevState === 'wake' && behavior.state === 'idle')
+      react('greet', pick(REACTIONS.greet), 0.6);
     prevState = behavior.state;
+
     syncView();
     if (!press?.dragging) syncPosition();
+    checkCursor(now);
+    if (isPrimary()) {
+      updateFocus();
+      checkWellbeing(now);
+    }
 
     if (!shown) {
       shown = true;
       void win.show();
     }
     // Cartoon pets tick a little faster at rest so blinks and quirks land on time.
-    const hz = Math.max(tickHz(behavior.state), expr ? 8 : 0);
+    const hz = Math.max(tickHz(behavior.state), expr ? 8 : 2);
     timer = window.setTimeout(frame, 1000 / hz);
   }
   wake();

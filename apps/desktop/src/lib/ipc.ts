@@ -9,6 +9,19 @@ export interface Settings {
   reducedMotion: boolean;
   sleepAfterMin: number;
   bedtimeHour: number;
+  waterEnabled: boolean;
+  waterEveryMin: number;
+  stretchEnabled: boolean;
+  stretchEveryMin: number;
+  eyeEnabled: boolean;
+  eyeEveryMin: number;
+  quietStart: number;
+  quietEnd: number;
+  focusMin: number;
+  breakMin: number;
+  dailyMessage: boolean;
+  compliments: boolean;
+  moodCheckin: boolean;
 }
 
 export interface DownloadProgress {
@@ -19,6 +32,9 @@ export interface DownloadProgress {
 export const ipc = {
   getSettings: () => invoke<Settings>('get_settings'),
   updateSettings: (patch: Partial<Settings>) => invoke<Settings>('update_settings', { patch }),
+
+  getWellbeingState: () => invoke<unknown>('get_wellbeing_state'),
+  setWellbeingState: (state: unknown) => invoke('set_wellbeing_state', { state }),
 
   listPets: () => invoke<PetManifest[]>('list_pets'),
   getPet: (id: string) => invoke<PetManifest>('get_pet', { id }),

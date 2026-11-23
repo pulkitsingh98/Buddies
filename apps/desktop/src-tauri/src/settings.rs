@@ -20,6 +20,23 @@ pub struct Settings {
     pub sleep_after_min: u32,
     /// Local hour (0–23) after which pets get sleepy and nudge you to bed.
     pub bedtime_hour: u8,
+
+    // --- wellbeing (delivered by the first pet that is out) ---
+    pub water_enabled: bool,
+    pub water_every_min: u32,
+    pub stretch_enabled: bool,
+    pub stretch_every_min: u32,
+    /// 20-20-20 eye breaks.
+    pub eye_enabled: bool,
+    pub eye_every_min: u32,
+    /// No reminders or chit-chat between these local hours (start may be > end, wrapping midnight).
+    pub quiet_start: u8,
+    pub quiet_end: u8,
+    pub focus_min: u32,
+    pub break_min: u32,
+    pub daily_message: bool,
+    pub compliments: bool,
+    pub mood_checkin: bool,
 }
 
 impl Default for Settings {
@@ -31,6 +48,19 @@ impl Default for Settings {
             reduced_motion: false,
             sleep_after_min: 5,
             bedtime_hour: 23,
+            water_enabled: true,
+            water_every_min: 60,
+            stretch_enabled: true,
+            stretch_every_min: 45,
+            eye_enabled: false,
+            eye_every_min: 20,
+            quiet_start: 22,
+            quiet_end: 8,
+            focus_min: 25,
+            break_min: 5,
+            daily_message: true,
+            compliments: true,
+            mood_checkin: true,
         }
     }
 }
@@ -40,6 +70,13 @@ impl Settings {
         self.pet_size = self.pet_size.clamp(80, 320);
         self.sleep_after_min = self.sleep_after_min.clamp(1, 120);
         self.bedtime_hour = self.bedtime_hour.min(23);
+        self.water_every_min = self.water_every_min.clamp(10, 240);
+        self.stretch_every_min = self.stretch_every_min.clamp(10, 240);
+        self.eye_every_min = self.eye_every_min.clamp(10, 120);
+        self.quiet_start = self.quiet_start.min(23);
+        self.quiet_end = self.quiet_end.min(23);
+        self.focus_min = self.focus_min.clamp(5, 120);
+        self.break_min = self.break_min.clamp(1, 60);
         self.active_pets.dedup();
         self
     }
@@ -118,6 +155,33 @@ pub fn update_settings(app: AppHandle, patch: serde_json::Value) -> Result<Setti
             *s = next;
         }
     })
+}
+
+/// Opaque per-device wellbeing state (counters, next-reminder times, streaks) owned by the pet
+/// page. Stored as JSON next to the settings.
+fn wellbeing_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("wellbeing.json"))
+}
+
+#[tauri::command]
+pub fn get_wellbeing_state(app: AppHandle) -> Result<serde_json::Value, String> {
+    Ok(fs::read_to_string(wellbeing_path(&app)?)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or(serde_json::Value::Null))
+}
+
+#[tauri::command]
+pub fn set_wellbeing_state(app: AppHandle, state: serde_json::Value) -> Result<(), String> {
+    let bytes = serde_json::to_vec(&state).map_err(|e| e.to_string())?;
+    if bytes.len() > 64 * 1024 {
+        return Err("wellbeing state too large".into());
+    }
+    write_atomic(&wellbeing_path(&app)?, &bytes)
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 import type { PetManifest } from '@deskpals/shared';
 import type { PetState } from './behavior';
+import { alignOffset, frameAnchor, type Anchor } from './anchor';
 import { poseTransform, restPose, type RestPose } from './pose';
 
 /** Hit grid resolution reported to Rust for click-through. */
@@ -19,7 +20,11 @@ export class PetView {
   private readonly spriteEl = byId('sprite');
   private readonly shadow = byId('shadow');
   private readonly bubble = byId('bubble');
+  private readonly badge = byId('badge');
+  private readonly motionPop = byId('pop');
   private readonly alphaGrids = new Map<string, Uint8Array>();
+  /** Per-frame shift (sprite px) that lines the frame's feet up with the neutral pose. */
+  private readonly offsets = new Map<string, { dx: number; dy: number }>();
   private readonly frames: Record<string, { x: number; y: number; w: number; h: number }>;
   /** Cutout pets are posed procedurally; cartoon pets have drawn poses instead. */
   private readonly procedural: boolean;
@@ -46,8 +51,8 @@ export class PetView {
       backgroundImage: `url(${spriteUrl})`,
       backgroundSize: `${(sprite.width / cellW) * 100}% ${(sprite.height / cellH) * 100}%`,
     });
+    this.analyseFrames();
     this.setFrame('neutral');
-    this.bubble.addEventListener('click', () => this.hideBubble());
   }
 
   /** The element pointer events should be attached to. */
@@ -69,17 +74,47 @@ export class PetView {
     const px = W === r.w ? 0 : (r.x / (W - r.w)) * 100;
     const py = H === r.h ? 0 : (r.y / (H - r.h)) * 100;
     this.spriteEl.style.backgroundPosition = `${px}% ${py}%`;
+    const o = this.offsets.get(this.frame) ?? { dx: 0, dy: 0 };
+    this.spriteEl.style.transform = `translate(${(o.dx / r.w) * 100}%, ${(o.dy / r.h) * 100}%)`;
     return true;
   }
 
-  private alphaGrid(): Uint8Array {
-    let g = this.alphaGrids.get(this.frame);
-    const r = this.frames[this.frame];
-    if (!g && r) {
-      g = buildAlphaGrid(this.sprite, r);
-      this.alphaGrids.set(this.frame, g);
+  /** One pass over the sprite sheet: hit grids and alignment offsets for every frame. */
+  private analyseFrames() {
+    const { width: W, height: H } = this.sprite;
+    const canvas = new OffscreenCanvas(W, H);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(this.sprite, 0, 0);
+    const sheet = ctx.getImageData(0, 0, W, H).data;
+    const anchors = new Map<string, Anchor>();
+    for (const [id, r] of Object.entries(this.frames)) {
+      const alpha = new Uint8Array(r.w * r.h);
+      for (let y = 0; y < r.h; y++) {
+        for (let x = 0; x < r.w; x++)
+          alpha[y * r.w + x] = sheet[((r.y + y) * W + r.x + x) * 4 + 3] ?? 0;
+      }
+      this.alphaGrids.set(id, poolAlpha(alpha, r.w, r.h));
+      const a = frameAnchor(alpha, r.w, r.h);
+      if (a) anchors.set(id, a);
     }
-    return g ?? new Uint8Array(ALPHA_GRID * ALPHA_GRID);
+    const ref = anchors.get('neutral');
+    if (!ref) return;
+    for (const [id, a] of anchors) {
+      const r = this.frames[id];
+      if (r && id !== 'neutral') this.offsets.set(id, alignOffset(ref, a, r.w, r.h));
+    }
+  }
+
+  private alphaGrid(): Uint8Array {
+    return this.alphaGrids.get(this.frame) ?? new Uint8Array(ALPHA_GRID * ALPHA_GRID).fill(255);
+  }
+
+  /** Short squash-and-pop on the sprite (used when the pet reacts). */
+  pop() {
+    this.motionPop.classList.remove('pop');
+    void this.motionPop.offsetWidth; // restart the animation
+    this.motionPop.classList.add('pop');
   }
 
   /** Lays out the sprite for the window size and pet height (CSS px). */
@@ -148,16 +183,66 @@ export class PetView {
     }
   }
 
-  showBubble(text: string, ms = 8000) {
-    this.bubble.textContent = text;
+  /**
+   * Speech bubble above the pet. Clicking the bubble dismisses it; action buttons call back and
+   * dismiss. Returns a function that closes it.
+   */
+  showBubble(
+    text: string,
+    opts: { ms?: number; actions?: BubbleAction[]; onTimeout?: () => void } = {},
+  ) {
+    this.bubble.replaceChildren();
+    const p = document.createElement('div');
+    p.textContent = text;
+    this.bubble.appendChild(p);
+    if (opts.actions?.length) {
+      const row = document.createElement('div');
+      row.className = 'actions';
+      for (const a of opts.actions) {
+        const b = document.createElement('button');
+        b.textContent = a.label;
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.hideBubble();
+          a.onClick();
+        });
+        row.appendChild(b);
+      }
+      this.bubble.appendChild(row);
+    }
+    this.bubble.onclick = () => this.hideBubble();
     this.bubble.hidden = false;
     this.bubble.style.bottom = `${window.innerHeight - this.box.top + 8}px`;
     clearTimeout(this.bubbleTimer);
-    this.bubbleTimer = window.setTimeout(() => this.hideBubble(), ms);
+    this.bubbleTimer = window.setTimeout(() => {
+      this.hideBubble();
+      opts.onTimeout?.();
+    }, opts.ms ?? 8000);
     this.onMaskChange?.();
+    return () => this.hideBubble();
+  }
+
+  /** Small pill above the pet (focus countdown). `null` hides it. */
+  setBadge(text: string | null, onClick?: () => void) {
+    const visible = text !== null;
+    if (visible) {
+      this.badge.textContent = text;
+      this.badge.style.bottom = `${window.innerHeight - this.box.top + 4}px`;
+      this.badge.onclick = onClick ?? null;
+    }
+    if (this.badge.hidden === visible) {
+      this.badge.hidden = !visible;
+      this.onMaskChange?.();
+    }
+  }
+
+  get bubbleOpen() {
+    return !this.bubble.hidden;
   }
 
   private hideBubble() {
+    clearTimeout(this.bubbleTimer);
+    if (this.bubble.hidden) return;
     this.bubble.hidden = true;
     this.onMaskChange?.();
   }
@@ -188,6 +273,7 @@ export class PetView {
       .translateSelf(-cx, -cy)
       .translateSelf(left, top)
       .scaleSelf(w / sw, h / sh)
+      .translateSelf(this.offsets.get(this.frame)?.dx ?? 0, this.offsets.get(this.frame)?.dy ?? 0)
       .inverse();
 
     const cells = new Uint8Array(cols * rows);
@@ -202,7 +288,9 @@ export class PetView {
         }
       }
     }
-    const bubble = this.bubble.hidden ? null : this.bubble.getBoundingClientRect();
+    const overlays = [this.bubble, this.badge]
+      .filter((el) => !el.hidden)
+      .map((el) => el.getBoundingClientRect());
     const bits = new Array<number>(Math.ceil((cols * rows) / 8)).fill(0);
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -214,10 +302,10 @@ export class PetView {
             on = rr >= 0 && cc >= 0 && rr < rows && cc < cols && cells[rr * cols + cc] === 1;
           }
         }
-        if (!on && bubble) {
+        if (!on && overlays.length) {
           const x = ((c + 0.5) * W) / cols;
           const y = ((r + 0.5) * H) / rows;
-          on = x >= bubble.left && x <= bubble.right && y >= bubble.top && y <= bubble.bottom;
+          on = overlays.some((b) => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom);
         }
         if (on) {
           const i = r * cols + c;
@@ -229,6 +317,11 @@ export class PetView {
   }
 }
 
+export interface BubbleAction {
+  label: string;
+  onClick: () => void;
+}
+
 function byId(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (!el) throw new Error(`missing #${id}`);
@@ -236,21 +329,13 @@ function byId(id: string): HTMLElement {
 }
 
 /** Downsampled alpha of one frame, max-pooled so thin parts (tails, ears) stay grabbable. */
-function buildAlphaGrid(
-  sprite: ImageBitmap,
-  r: { x: number; y: number; w: number; h: number },
-): Uint8Array {
-  const canvas = new OffscreenCanvas(r.w, r.h);
-  const ctx = canvas.getContext('2d');
+function poolAlpha(alpha: Uint8Array, w: number, h: number): Uint8Array {
   const grid = new Uint8Array(ALPHA_GRID * ALPHA_GRID);
-  if (!ctx) return grid.fill(255);
-  ctx.drawImage(sprite, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-  const { data } = ctx.getImageData(0, 0, r.w, r.h);
-  for (let y = 0; y < r.h; y++) {
-    const gy = Math.floor((y / r.h) * ALPHA_GRID);
-    for (let x = 0; x < r.w; x++) {
-      const gi = gy * ALPHA_GRID + Math.floor((x / r.w) * ALPHA_GRID);
-      const a = data[(y * r.w + x) * 4 + 3] ?? 0;
+  for (let y = 0; y < h; y++) {
+    const gy = Math.floor((y / h) * ALPHA_GRID);
+    for (let x = 0; x < w; x++) {
+      const gi = gy * ALPHA_GRID + Math.floor((x / w) * ALPHA_GRID);
+      const a = alpha[y * w + x] ?? 0;
       if (a > (grid[gi] ?? 0)) grid[gi] = a;
     }
   }

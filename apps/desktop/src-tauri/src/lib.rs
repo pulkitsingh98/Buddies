@@ -30,6 +30,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::update_settings,
+            settings::get_wellbeing_state,
+            settings::set_wellbeing_state,
             pets::list_pets,
             pets::get_pet,
             pets::get_pet_sprite,

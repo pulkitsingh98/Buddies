@@ -36,6 +36,7 @@ body {
   transition-duration: 0.1s;
 }
 #motion,
+#pop,
 #flip {
   width: 100%;
   height: 100%;
@@ -153,6 +154,21 @@ body {
   }
 }
 
+#pop.pop {
+  animation: pop 0.28s ease-out;
+}
+@keyframes pop {
+  40% {
+    transform: scale(1.08, 0.92);
+  }
+  70% {
+    transform: scale(0.96, 1.05);
+  }
+}
+#sprite {
+  transition: transform 0.08s;
+}
+
 /* ---- hearts ---- */
 .heart {
   position: absolute;
@@ -194,6 +210,26 @@ body {
   text-align: center;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
 }
+#bubble .actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+#bubble button {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  border: 1px solid #eadfd8;
+  background: #fff7f1;
+  color: #2b2320;
+  cursor: pointer;
+}
+#bubble button:hover {
+  background: #ffe6d6;
+}
 #bubble::after {
   content: '';
   position: absolute;
@@ -203,4 +239,23 @@ body {
   border: 6px solid transparent;
   border-bottom: 0;
   border-top-color: #fff;
+}
+
+/* ---- focus badge ---- */
+#badge {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #2b2320;
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+}
+#badge[hidden],
+#bubble[hidden] {
+  display: none;
 }

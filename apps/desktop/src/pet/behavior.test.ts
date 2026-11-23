@@ -34,9 +34,27 @@ describe('Behavior', () => {
     expect(b.state).toBe('walk');
     expect(b.targetX).toBeCloseTo(900);
     expect(b.dir).toBe(1);
-    run(b, 800 / 60 + 0.1); // 800px at 60px/s
+    run(b, 800 / 60 + 1.5); // 800px at 60px/s, plus easing in and out
     expect(b.x).toBeCloseTo(900);
     expect(b.state).not.toBe('walk');
+  });
+
+  it('eases in at the start of a walk', () => {
+    const b = new Behavior(cfg, 100, seq(0, 0.1, 0.9));
+    run(b, 5.1);
+    const x0 = b.x;
+    b.tick(0.05, world());
+    const early = b.x - x0;
+    run(b, 1);
+    const x1 = b.x;
+    b.tick(0.05, world());
+    expect(early).toBeLessThan(b.x - x1);
+  });
+
+  it('stays sitting during focus sessions', () => {
+    const b = new Behavior({ ...cfg, stayPut: true }, 100, seq(0.01));
+    run(b, 60);
+    expect(b.state).toBe('sit');
   });
 
   it('never walks with reduced motion', () => {

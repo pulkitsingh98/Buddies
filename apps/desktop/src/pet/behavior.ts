@@ -15,6 +15,8 @@ export interface BehaviorConfig {
   reducedMotion: boolean;
   /** Walking speed in px/s. */
   walkSpeed: number;
+  /** Stay sitting beside the user (focus sessions). */
+  stayPut?: boolean;
 }
 
 export interface World {
@@ -193,6 +195,10 @@ export class Behavior {
   }
 
   private chooseNext(world: World) {
+    if (this.cfg.stayPut) {
+      this.enter('sit');
+      return;
+    }
     const r = this.rng();
     const walkChance = this.cfg.reducedMotion ? 0 : this.sleepy ? 0.1 : 0.35;
     const sitChance = this.sleepy ? 0.5 : 0.3;
@@ -218,8 +224,11 @@ export class Behavior {
 
   private walk(dt: number, world: World) {
     const target = clamp(this.targetX ?? this.x, world.minX, world.maxX);
-    const speed = this.cfg.walkSpeed * (this.sleepy ? 0.6 : 1);
-    const step = speed * dt;
+    // Ease in over the first 0.4s and ease out over the last ~40px, so walks don't glide.
+    const remaining = Math.abs(target - this.x);
+    const ease = Math.min(1, 0.15 + this.stateTime / 0.4) * Math.min(1, 0.3 + remaining / 40);
+    const speed = this.cfg.walkSpeed * (this.sleepy ? 0.6 : 1) * ease;
+    const step = Math.max(speed * dt, Math.min(remaining, 0.5));
     if (Math.abs(target - this.x) <= step) {
       this.x = target;
       this.enter('idle');
