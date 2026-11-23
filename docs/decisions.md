@@ -22,6 +22,7 @@
 | React + ReactDOM (settings window only)   | ~190 KB min | Under threshold; listed for awareness. Pet windows will not load React.   |
 
 ## 2026-11-23 — Cartoon pets on a free image model
+
 - **Requirement**: no paid services.
 - **Choice**: FLUX.2 [klein] 4B on **Cloudflare Workers AI**, called from the `generate-pet` Edge Function.
   The free plan gives 10,000 neurons/day forever (about 125 per 1024² image with a reference, so ~4 pets/day

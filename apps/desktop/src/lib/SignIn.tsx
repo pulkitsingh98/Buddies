@@ -14,83 +14,78 @@ export function useSession(): Session | null | undefined {
   return session;
 }
 
-/** Email + 6-digit code sign-in. No passwords, no browser redirect. */
+/** Email + password sign-in / sign-up. No emails are sent (confirmation is off server-side). */
 export function SignIn({ reason }: { reason: string }) {
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!supabase) return <p className="error">This build isn&apos;t connected to the server.</p>;
   const client = supabase;
 
-  async function send() {
+  async function submit() {
     setBusy(true);
     setError(null);
-    const { error } = await client.auth.signInWithOtp({
-      email: email.trim(),
-      options: { shouldCreateUser: true },
-    });
+    const creds = { email: email.trim(), password };
+    const { data, error } =
+      mode === 'signup'
+        ? await client.auth.signUp(creds)
+        : await client.auth.signInWithPassword(creds);
     setBusy(false);
-    if (error) setError(error.message);
-    else setSent(true);
+    if (error) {
+      // Signing up with an existing email: switch to sign-in for them.
+      if (mode === 'signup' && /already registered/i.test(error.message)) {
+        setMode('signin');
+        setError('You already have an account — enter your password to sign in.');
+      } else setError(error.message);
+    } else if (mode === 'signup' && !data.session) {
+      setError('Account created, but the server still requires email confirmation.');
+    }
   }
 
-  async function verify() {
-    setBusy(true);
-    setError(null);
-    const { error } = await client.auth.verifyOtp({
-      email: email.trim(),
-      token: code.trim(),
-      type: 'email',
-    });
-    setBusy(false);
-    if (error) setError(error.message);
-  }
-
+  const valid = email.includes('@') && password.length >= 6;
   return (
-    <div className="signin">
+    <form
+      className="signin"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid) void submit();
+      }}
+    >
       <p className="muted">{reason}</p>
-      {!sent ? (
-        <div className="signin-row">
-          <input
-            type="text"
-            inputMode="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <button
-            className="primary"
-            disabled={busy || !email.includes('@')}
-            onClick={() => void send()}
-          >
-            Email me a code
-          </button>
-        </div>
-      ) : (
-        <div className="signin-row">
-          <input
-            type="text"
-            inputMode="numeric"
-            placeholder="6-digit code"
-            maxLength={10}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <button
-            className="primary"
-            disabled={busy || code.trim().length < 6}
-            onClick={() => void verify()}
-          >
-            Sign in
-          </button>
-          <button onClick={() => setSent(false)}>Back</button>
-        </div>
-      )}
-      {sent && <p className="muted small">Check {email} for a code.</p>}
+      <div className="signin-row">
+        <input
+          type="text"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          type="password"
+          autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+          placeholder="Password (6+ characters)"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button className="primary" type="submit" disabled={busy || !valid}>
+          {mode === 'signup' ? 'Create account' : 'Sign in'}
+        </button>
+      </div>
+      <p className="muted small">
+        {mode === 'signup' ? 'Already have an account? ' : 'New here? '}
+        <button
+          type="button"
+          className="link"
+          onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
+        >
+          {mode === 'signup' ? 'Sign in' : 'Create one'}
+        </button>
+      </p>
       {error && <p className="error">{error}</p>}
-    </div>
+    </form>
   );
 }
