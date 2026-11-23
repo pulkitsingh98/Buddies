@@ -7,7 +7,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::Mutex,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use rusqlite::{params, Connection};
@@ -17,8 +17,6 @@ use tauri::{AppHandle, Manager, State};
 use crate::settings::SettingsState;
 
 const HISTORY_DAYS: u64 = 30;
-/// Files changed this recently may still be open (best effort where we can't check locks).
-const RECENT_SECS: u64 = 30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum Category {
@@ -166,10 +164,12 @@ fn in_use(path: &Path, _meta: &fs::Metadata) -> bool {
 
 #[cfg(not(windows))]
 fn in_use(_path: &Path, meta: &fs::Metadata) -> bool {
+    /// Files changed this recently may still be open (best effort where locks can't be checked).
+    const RECENT: std::time::Duration = std::time::Duration::from_secs(30);
     meta.modified()
         .ok()
         .and_then(|m| SystemTime::now().duration_since(m).ok())
-        .is_some_and(|age| age < Duration::from_secs(RECENT_SECS))
+        .is_some_and(|age| age < RECENT)
 }
 
 /// `dir/name`, or `dir/name (1).ext`, `(2)`… — never an existing or already-planned path.
@@ -648,6 +648,7 @@ pub fn reveal(app: AppHandle, path: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     fn touch(dir: &Path, name: &str, contents: &str) -> PathBuf {
         let p = dir.join(name);
