@@ -44,4 +44,5 @@ Full product spec lives in `docs/spec.md`; decisions and dependency justificatio
 
 ## Status
 
-- Phase 0 (foundations): in progress.
+- Phase 0 (foundations): done — v0.1.0 released with universal .dmg + x64 NSIS installer + signed latest.json. Pending: manual install QA on both OSes, hosted Supabase link + `db push`.
+- Supabase project ref: `fbsmbgptbkrgmarxctih` (ap-northeast-2).
