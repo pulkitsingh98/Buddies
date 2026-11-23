@@ -150,23 +150,14 @@ async function connect(s: Session | null) {
   });
   channels.push(me);
 
-  // Live inbox and friend-request changes (RLS limits both to rows I'm part of).
+  // My private channel: the database broadcasts new interactions and friend-list changes here.
   const inbox = client
-    .channel(`inbox:${uid}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'interactions',
-        filter: `recipient_id=eq.${uid}`,
-      },
-      (p) => void deliver(p.new as Interaction),
-    )
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => {
-      void refreshFriends();
-    })
-    .subscribe();
+    .channel(`user:${uid}`, { config: { private: true } })
+    .on('broadcast', { event: 'interaction' }, (m) => void deliver(m.payload as Interaction))
+    .on('broadcast', { event: 'friends_changed' }, () => void refreshFriends())
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') void flushQueue();
+    });
   channels.push(inbox);
 
   await refreshFriends();

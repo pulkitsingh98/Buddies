@@ -96,60 +96,54 @@ ok(
   `Eve can't watch Bob's presence (${eveStatus})`,
 );
 
-// Live inbox: Bob sends a visit, Alice receives it via postgres_changes.
-let visit = null;
-let sentAt;
-let receivedAt = 0;
+// Live inbox: Bob sends a visit, Alice receives it on her private "user:<id>" broadcast channel.
+// Warm up with a heart first (real clients keep this channel open all day), then time the visit.
+const inbox = [];
 await new Promise((resolve) => {
   a.c
-    .channel(`inbox:${a.id}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'interactions',
-        filter: `recipient_id=eq.${a.id}`,
-      },
-      (p) => {
-        visit = p.new;
-        receivedAt = Date.now();
-        resolve();
-      },
+    .channel(`user:${a.id}`, { config: { private: true } })
+    .on('broadcast', { event: 'interaction' }, (m) =>
+      inbox.push({ row: m.payload, at: Date.now() }),
     )
     .subscribe((s) => {
       if (s === 'SUBSCRIBED') resolve();
     });
 });
-await sleep(1000);
-sentAt = Date.now();
+for (let i = 0; i < 30 && inbox.length === 0; i++) {
+  if (i % 5 === 0) await b.c.rpc('send_interaction', { recipient: a.id, kind: 'heart' });
+  await sleep(1000);
+}
+ok(inbox.length > 0, 'realtime change feed is up');
+const sentAt = Date.now();
 const sent = await b.c.rpc('send_interaction', {
   recipient: a.id,
   kind: 'visit',
   message: 'hello from Bob!',
   pet: petId,
 });
-for (let i = 0; i < 50 && !visit; i++) await sleep(100);
+let visit = null;
+for (let i = 0; i < 100 && !visit; i++) {
+  visit = inbox.find((m) => m.row.type === 'visit') ?? null;
+  if (!visit) await sleep(50);
+}
+const latency = visit ? visit.at - sentAt : NaN;
 ok(
-  !sent.error && visit?.body === 'hello from Bob!',
-  `Alice receives the visit live in ${receivedAt - sentAt} ms ${sent.error?.message ?? ''}`,
+  !sent.error && visit?.row.body === 'hello from Bob!',
+  `Alice receives the visit live in ${latency} ms ${sent.error?.message ?? ''}`,
 );
-ok(visit && receivedAt - sentAt < 2000, 'visit arrives within 2 seconds (Phase 3 acceptance)');
+ok(latency < 2000, 'visit arrives within 2 seconds (Phase 3 acceptance)');
 
-// Eve's inbox subscription must not leak Alice's rows.
+// Eve can't listen on Alice's channel.
 let leaked = false;
+let eveJoin = '';
 e.c
-  .channel('snoop')
-  .on(
-    'postgres_changes',
-    { event: 'INSERT', schema: 'public', table: 'interactions' },
-    () => (leaked = true),
-  )
-  .subscribe();
+  .channel(`user:${a.id}`, { config: { private: true } })
+  .on('broadcast', { event: 'interaction' }, () => (leaked = true))
+  .subscribe((s) => (eveJoin = s));
 await sleep(1500);
 await b.c.rpc('send_interaction', { recipient: a.id, kind: 'nudge' });
 await sleep(2500);
-ok(!leaked, "Eve's realtime subscription does not see others' interactions");
+ok(!leaked && eveJoin !== 'SUBSCRIBED', `Eve cannot join Alice's channel (${eveJoin})`);
 
 // Offline queue: undelivered rows are fetchable later.
 const { data: queued } = await a.c
