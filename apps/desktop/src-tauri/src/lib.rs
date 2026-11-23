@@ -10,6 +10,9 @@ mod windows;
 use tauri::{Manager, RunEvent};
 
 pub fn run() {
+    // HTTPS (model downloads, updater) needs a process-wide rustls crypto provider.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let app = tauri::Builder::default()
         // Must be registered first so a second launch is caught before anything else starts.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {

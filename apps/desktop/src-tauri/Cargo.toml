@@ -24,6 +24,8 @@ serde_json = "1"
 # Shares the TLS stack the updater plugin already enables (rustls); no extra TLS dependency.
 reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 futures-util = "0.3"
+# reqwest is built without a crypto provider (as the updater does); we install ring at startup.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 sha2 = "0.10"
 tokio = { version = "1", features = ["fs", "io-util"] }
 

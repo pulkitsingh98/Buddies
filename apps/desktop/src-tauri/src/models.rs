@@ -134,3 +134,29 @@ pub async fn read_segmentation_asset(app: AppHandle, name: String) -> Result<Res
         .map_err(|e| e.to_string())?;
     Ok(Response::new(bytes))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Network test: `cargo test -- --ignored models`. Checks the mirrored assets are reachable
+    /// over HTTPS (redirects included) with the same client setup the app uses.
+    #[test]
+    #[ignore]
+    fn models_assets_are_downloadable() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        tauri::async_runtime::block_on(async {
+            let client = reqwest::Client::new();
+            for a in ASSETS {
+                let res = client
+                    .get(format!("{BASE_URL}/{}", a.name))
+                    .header("Range", "bytes=0-15")
+                    .send()
+                    .await
+                    .and_then(|r| r.error_for_status())
+                    .unwrap_or_else(|e| panic!("{}: {e}", a.name));
+                assert!(!res.bytes().await.unwrap().is_empty(), "{} empty", a.name);
+            }
+        });
+    }
+}
