@@ -47,11 +47,20 @@ jobs:
         working-directory: apps/desktop/src-tauri
 
   db:
-    name: Migrations + RLS tests
+    name: Migrations, RLS + e2e social tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: supabase/setup-cli@v3
         with: { version: latest }
-      - run: supabase db start
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Full local stack (auth, storage, realtime) for the end-to-end social test.
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit
       - run: supabase test db
+      - name: End-to-end social test (friends, storage, presence, live visit)
+        run: |
+          eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY)=')"
+          API_URL=$API_URL ANON_KEY=$ANON_KEY node scripts/e2e-social.mjs

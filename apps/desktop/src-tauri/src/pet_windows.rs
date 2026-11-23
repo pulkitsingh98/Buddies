@@ -6,11 +6,18 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::{pets, settings::SettingsState};
 
 pub const LABEL_PREFIX: &str = "pet-";
+/// Friends' pets visiting this screen.
+pub const VISIT_PREFIX: &str = "visit-";
+
+/// Windows that render a pet (own or visiting): transparent, click-through except on the pet.
+pub fn is_pet_like(label: &str) -> bool {
+    label.starts_with(LABEL_PREFIX) || label.starts_with(VISIT_PREFIX)
+}
 
 /// Runtime-only state that suppresses pets without touching saved settings.
 #[derive(Default)]
@@ -65,13 +72,42 @@ pub fn reconcile(app: &AppHandle) {
             }
         }
     }
+    let mut spawned = false;
     for lbl in wanted {
         if app.get_webview_window(&lbl).is_none() {
-            if let Err(e) = spawn(app, &lbl, w, h) {
-                log::error!("failed to create {lbl}: {e}");
+            match spawn(app, &lbl, w, h) {
+                Ok(()) => spawned = true,
+                Err(e) => log::error!("failed to create {lbl}: {e}"),
             }
         }
     }
+    if spawned {
+        // Lets the social window deliver anything that queued while no pet was out.
+        let _ = app.emit("pets://spawned", ());
+    }
+}
+
+/// Number of own pets currently on screen (visits wait until at least one is out).
+#[tauri::command]
+pub fn pets_out(app: AppHandle) -> usize {
+    app.webview_windows()
+        .keys()
+        .filter(|l| l.starts_with(LABEL_PREFIX))
+        .count()
+}
+
+/// Shows a friend's pet visiting, for the given interaction id. The page loads the details itself.
+#[tauri::command]
+pub fn spawn_visitor(app: AppHandle, id: String) -> Result<(), String> {
+    if !crate::pets::valid_id(&id) {
+        return Err("invalid visit id".into());
+    }
+    let lbl = format!("{VISIT_PREFIX}{id}");
+    if app.get_webview_window(&lbl).is_some() {
+        return Ok(());
+    }
+    let (w, h) = window_size(app.state::<SettingsState>().get().pet_size);
+    spawn(&app, &lbl, w, h).map_err(|e| e.to_string())
 }
 
 fn spawn(app: &AppHandle, lbl: &str, w: f64, h: f64) -> tauri::Result<()> {

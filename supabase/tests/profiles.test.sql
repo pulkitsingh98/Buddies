@@ -8,7 +8,9 @@ values
   ('11111111-1111-1111-1111-111111111111', 'a@test.dev', '{"display_name":"Alice"}'),
   ('22222222-2222-2222-2222-222222222222', 'b@test.dev', '{}');
 
-select is((select count(*)::int from public.profiles), 2, 'trigger creates a profile per user');
+select is((select count(*)::int from public.profiles
+  where id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222')), 2,
+  'trigger creates a profile per user');
 select matches(
   (select friend_code from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
   '^[A-Z0-9]{8}$', 'friend code has expected shape');

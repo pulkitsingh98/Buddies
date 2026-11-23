@@ -76,7 +76,7 @@ pub fn start_fullscreen_watch(app: tauri::AppHandle) {
                 if now != suspended {
                     suspended = now;
                     for (label, win) in app.webview_windows() {
-                        if label.starts_with(crate::pet_windows::LABEL_PREFIX) {
+                        if crate::pet_windows::is_pet_like(&label) {
                             let _ = if now { win.hide() } else { win.show() };
                         }
                     }

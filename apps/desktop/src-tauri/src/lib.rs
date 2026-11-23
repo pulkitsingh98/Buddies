@@ -44,6 +44,9 @@ pub fn run() {
             models::read_segmentation_asset,
             windows::open_creator,
             windows::open_settings,
+            windows::open_friends,
+            pet_windows::pets_out,
+            pet_windows::spawn_visitor,
         ])
         .setup(|app| {
             // Menu-bar-only app: no Dock icon on macOS.
@@ -59,6 +62,7 @@ pub fn run() {
             hit_test::start(app.handle().clone());
             system::start_fullscreen_watch(app.handle().clone());
             pet_windows::reconcile(app.handle());
+            windows::start_social(app.handle())?;
 
             // First run: no pets yet, so go straight to making one.
             if pets::list_pets(app.handle().clone()).is_ok_and(|p| p.is_empty()) {

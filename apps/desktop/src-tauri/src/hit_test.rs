@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Mutex, time::Duration};
 
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
-use crate::pet_windows::LABEL_PREFIX;
+use crate::pet_windows::is_pet_like;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HitMask {
@@ -99,7 +99,7 @@ fn tick(app: &AppHandle) -> bool {
 
     let mut near = false;
     for (label, win) in app.webview_windows() {
-        if !label.starts_with(LABEL_PREFIX) {
+        if !is_pet_like(&label) {
             continue;
         }
         let (Ok(pos), Ok(size)) = (win.outer_position(), win.inner_size()) else {

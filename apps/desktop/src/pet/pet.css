@@ -259,3 +259,19 @@ body {
 #bubble[hidden] {
   display: none;
 }
+
+/* ---- reply box ---- */
+#bubble form.reply {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+#bubble form.reply input {
+  font: inherit;
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid #eadfd8;
+}

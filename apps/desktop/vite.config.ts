@@ -40,6 +40,8 @@ export default defineConfig({
         settings: resolve(import.meta.dirname, 'settings.html'),
         creator: resolve(import.meta.dirname, 'creator.html'),
         pet: resolve(import.meta.dirname, 'pet.html'),
+        social: resolve(import.meta.dirname, 'social.html'),
+        friends: resolve(import.meta.dirname, 'friends.html'),
       },
     },
   },

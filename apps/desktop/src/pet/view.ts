@@ -222,6 +222,54 @@ export class PetView {
     return () => this.hideBubble();
   }
 
+  /**
+   * Bubble with a text box (replying to a friend). The window must be made focusable by the
+   * caller first — pet windows normally never take keyboard focus.
+   */
+  showInput(
+    prompt: string,
+    maxLength: number,
+    onSend: (text: string) => void,
+    onClose: () => void,
+  ) {
+    this.bubble.replaceChildren();
+    const label = document.createElement('div');
+    label.textContent = prompt;
+    const form = document.createElement('form');
+    form.className = 'reply';
+    const input = document.createElement('input');
+    input.maxLength = maxLength;
+    input.placeholder = 'Type a reply…';
+    const sendBtn = document.createElement('button');
+    sendBtn.type = 'submit';
+    sendBtn.textContent = 'Send';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = '✕';
+    form.append(input, sendBtn, cancel);
+    this.bubble.append(label, form);
+    const close = () => {
+      this.hideBubble();
+      onClose();
+    };
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      close();
+      onSend(text);
+    };
+    cancel.onclick = close;
+    input.onkeydown = (e) => e.key === 'Escape' && close();
+    this.bubble.onclick = null;
+    this.bubble.hidden = false;
+    this.bubble.style.bottom = `${window.innerHeight - this.box.top + 8}px`;
+    clearTimeout(this.bubbleTimer);
+    this.bubbleTimer = window.setTimeout(close, 90_000);
+    this.onMaskChange?.();
+    setTimeout(() => input.focus(), 50);
+  }
+
   /** Small pill above the pet (focus countdown). `null` hides it. */
   setBadge(text: string | null, onClick?: () => void) {
     const visible = text !== null;

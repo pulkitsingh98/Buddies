@@ -37,3 +37,16 @@ Run on **both** macOS and Windows for every release. Tick each box per OS.
 | Tray → Start Focus Timer: pet sits, countdown badge, celebrates at the end      | ☐     | ☐       |
 | Kind message once per morning; mood check-in once after noon                    | ☐     | ☐       |
 | Settings persist across restarts                                                | ☐     | ☐       |
+
+## Phase 3 — Social (needs two machines)
+
+| Check                                                                             | macOS | Windows |
+| --------------------------------------------------------------------------------- | ----- | ------- |
+| Friends window: sign in, set name, copy friend code                               | ☐     | ☐       |
+| Add the other's code → request appears → accept → both see each other online      | ☐     | ☐       |
+| Send my pet to visit with a message → it walks in on the other screen within ~2 s | ☐     | ☐       |
+| Reply from the visitor's bubble → message arrives at the other's pet              | ☐     | ☐       |
+| Nudge and heart arrive at the other's pet with "nudge back" / "send one back"     | ☐     | ☐       |
+| Quit the app on one side, send a visit, reopen → it arrives                       | ☐     | ☐       |
+| Do Not Disturb holds visits; turning it off delivers them                         | ☐     | ☐       |
+| Block: the blocked side's sends silently do nothing                               | ☐     | ☐       |

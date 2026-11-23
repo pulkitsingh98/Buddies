@@ -1,0 +1,112 @@
+.friends {
+  padding: 20px;
+}
+.code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.code strong {
+  font-size: 22px;
+  letter-spacing: 3px;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+}
+.row-inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.status {
+  font-size: 12px;
+}
+.status .dot,
+.friend .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b9aea8;
+  margin-right: 4px;
+}
+.dot.on {
+  background: #3fb950;
+}
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.friend {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.friend > button.head {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.avatar {
+  width: 44px;
+  height: 44px;
+  background-repeat: no-repeat;
+  border-radius: 10px;
+}
+.friend .name {
+  font-weight: 600;
+}
+.panel {
+  padding: 0 10px 10px;
+}
+.panel textarea {
+  font: inherit;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+}
+.panel .buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.chat {
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.chat .msg {
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: var(--bg);
+  max-width: 85%;
+}
+.chat .msg.mine {
+  justify-self: end;
+  background: #ffe6d6;
+  color: #2b2320;
+}
+.ok {
+  color: #2e8b57;
+}

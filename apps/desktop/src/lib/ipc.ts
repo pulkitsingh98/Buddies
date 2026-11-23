@@ -22,6 +22,8 @@ export interface Settings {
   dailyMessage: boolean;
   compliments: boolean;
   moodCheckin: boolean;
+  doNotDisturb: boolean;
+  shareMood: boolean;
 }
 
 export interface DownloadProgress {
@@ -61,4 +63,7 @@ export const ipc = {
 
   openCreator: () => invoke('open_creator'),
   openSettings: () => invoke('open_settings'),
+  openFriends: () => invoke('open_friends'),
+  petsOut: () => invoke<number>('pets_out'),
+  spawnVisitor: (id: string) => invoke('spawn_visitor', { id }),
 };

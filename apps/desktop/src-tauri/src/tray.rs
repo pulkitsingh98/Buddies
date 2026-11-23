@@ -48,6 +48,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                     log::error!("failed to open settings: {e}");
                 }
             }
+            "friends" => {
+                if let Err(e) = windows::show_friends(app) {
+                    log::error!("failed to open friends: {e}");
+                }
+            }
             "new_pet" => {
                 if let Err(e) = windows::show_creator(app) {
                     log::error!("failed to open creator: {e}");

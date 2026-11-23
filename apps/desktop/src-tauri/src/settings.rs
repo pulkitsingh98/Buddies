@@ -37,6 +37,12 @@ pub struct Settings {
     pub daily_message: bool,
     pub compliments: bool,
     pub mood_checkin: bool,
+
+    // --- social ---
+    /// Queue incoming visits/messages instead of showing them.
+    pub do_not_disturb: bool,
+    /// Let friends see today's mood check-in.
+    pub share_mood: bool,
 }
 
 impl Default for Settings {
@@ -61,6 +67,8 @@ impl Default for Settings {
             daily_message: true,
             compliments: true,
             mood_checkin: true,
+            do_not_disturb: false,
+            share_mood: false,
         }
     }
 }

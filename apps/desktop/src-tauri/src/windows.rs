@@ -2,6 +2,8 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub const SETTINGS: &str = "settings";
 pub const CREATOR: &str = "creator";
+pub const FRIENDS: &str = "friends";
+pub const SOCIAL: &str = "social";
 
 /// Shows (or creates) a regular app window. Windows are destroyed on close, not hidden,
 /// so they cost no memory while pets run all day.
@@ -37,6 +39,32 @@ pub fn show_settings(app: &AppHandle) -> tauri::Result<()> {
 
 pub fn show_creator(app: &AppHandle) -> tauri::Result<()> {
     show(app, CREATOR, "creator.html", "Make a pet", (640.0, 760.0))
+}
+
+pub fn show_friends(app: &AppHandle) -> tauri::Result<()> {
+    show(app, FRIENDS, "friends.html", "Friends", (480.0, 680.0))
+}
+
+/// Hidden window that holds the realtime connection (presence, incoming visits and messages)
+/// for as long as the app runs.
+pub fn start_social(app: &AppHandle) -> tauri::Result<()> {
+    if app.get_webview_window(SOCIAL).is_some() {
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(app, SOCIAL, WebviewUrl::App("social.html".into()))
+        .title("DeskPals social")
+        .visible(false)
+        .focused(false)
+        .focusable(false)
+        .skip_taskbar(true)
+        .inner_size(200.0, 200.0)
+        .build()?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_friends(app: AppHandle) -> Result<(), String> {
+    show_friends(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

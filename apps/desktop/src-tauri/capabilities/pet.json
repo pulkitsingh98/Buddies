@@ -1,13 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "pet-windows",
-  "description": "Pet windows: move/show themselves and query monitors. Nothing else.",
-  "windows": ["pet-*"],
+  "description": "Own and visiting pet windows: move/show/close themselves, take focus briefly to type a reply.",
+  "windows": ["pet-*", "visit-*"],
   "permissions": [
     "core:event:default",
     "core:window:default",
     "core:window:allow-set-position",
     "core:window:allow-show",
+    "core:window:allow-close",
+    "core:window:allow-set-focusable",
+    "core:window:allow-set-focus",
     "log:default"
   ]
 }

@@ -1,4 +1,5 @@
-import { listen } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
+import { MESSAGE_MAX_LEN } from '@deskpals/shared';
 import {
   currentMonitor,
   cursorPosition,
@@ -8,6 +9,7 @@ import {
 } from '@tauri-apps/api/window';
 import { ipc, type Settings } from '../lib/ipc';
 import { forwardErrors } from '../lib/log';
+import { EVENTS, send, type IncomingEvent } from '../lib/social';
 import { Behavior, type BehaviorConfig, type PetState } from './behavior';
 import { Expressions, type Reaction } from './expressions';
 import { FocusTimer } from './focus';
@@ -419,6 +421,7 @@ async function main() {
             label: m.emoji,
             onClick: () => {
               wellbeing.setMood(m.emoji);
+              void emit(EVENTS.mood, { emoji: m.emoji });
               saveWellbeing();
               react(m.emoji === '😔' || m.emoji === '😫' ? 'hover' : 'click');
               say(m.reply, 5000);
@@ -535,6 +538,75 @@ async function main() {
       );
   });
 
+  // --- friends: nudges, hearts and messages arrive at your own (first) pet ---
+  const replyTo = async (to: string, name: string) => {
+    await win.setFocusable(true).catch(() => {});
+    await win.setFocus().catch(() => {});
+    view.showInput(
+      `Reply to ${name}`,
+      MESSAGE_MAX_LEN,
+      (text) =>
+        void send(to, 'message', text)
+          .then(() => say('Sent! 💌', 2000))
+          .catch((e: unknown) => say(e instanceof Error ? e.message : String(e), 4000)),
+      () => void win.setFocusable(false).catch(() => {}),
+    );
+  };
+  const sendBack = (to: string, kind: 'nudge' | 'heart', done: string) =>
+    void send(to, kind)
+      .then(() => say(done, 2000))
+      .catch((e: unknown) => say(e instanceof Error ? e.message : String(e), 4000));
+  void listen<IncomingEvent>(EVENTS.incoming, (e) => {
+    if (!isPrimary()) return;
+    const { interaction: it, senderName: name } = e.payload;
+    interacted();
+    if (behavior.state === 'sleep') behavior.dispatch({ type: 'pet' });
+    switch (it.type) {
+      case 'nudge':
+        behavior.dispatch({ type: 'celebrate' });
+        react('nudge');
+        ask(
+          `${name} nudged you! 👉`,
+          [
+            {
+              label: '👉 Nudge back',
+              onClick: () => sendBack(it.sender_id, 'nudge', 'Nudged back!'),
+            },
+          ],
+          20_000,
+        );
+        break;
+      case 'heart':
+        view.addHearts(8);
+        react('hover');
+        ask(
+          `${name} is thinking of you 💕`,
+          [
+            {
+              label: '💕 Send one back',
+              onClick: () => sendBack(it.sender_id, 'heart', 'Love sent 💕'),
+            },
+          ],
+          20_000,
+        );
+        break;
+      case 'message':
+        react('greet');
+        ask(
+          `${name}: “${it.body ?? ''}”`,
+          [
+            { label: 'Reply', onClick: () => void replyTo(it.sender_id, name) },
+            { label: '💕', onClick: () => sendBack(it.sender_id, 'heart', 'Love sent 💕') },
+          ],
+          60_000,
+        );
+        break;
+      default:
+        break;
+    }
+    wake();
+  });
+
   // --- settings, resize, suspension ---
   void listen<Settings>('settings://changed', (e) => {
     settings = e.payload;
@@ -608,6 +680,8 @@ async function main() {
 }
 
 forwardErrors(win.label);
-main().catch((e: unknown) => {
-  throw e;
-});
+(win.label.startsWith('visit-') ? import('./visitor').then((m) => m.runVisitor()) : main()).catch(
+  (e: unknown) => {
+    throw e;
+  },
+);
