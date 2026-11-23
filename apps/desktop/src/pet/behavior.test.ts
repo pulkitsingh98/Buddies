@@ -89,20 +89,30 @@ describe('Behavior', () => {
     expect(b.drainEffects()).toEqual(['hearts']);
   });
 
-  it('drag → drop in the air → falls under gravity → lands → idle', () => {
-    const b = new Behavior(cfg, 100, seq(0.5));
+  it('stays where it is dropped, and stays put there', () => {
+    const b = new Behavior(cfg, 100, seq(0.1, 0.1, 0.9));
     b.dispatch({ type: 'dragStart' });
     b.dispatch({ type: 'dragMove', x: 400, lift: 300 });
     b.tick(1 / 30, world());
     expect(b.state).toBe('drag');
-    expect(b.x).toBe(400);
     b.dispatch({ type: 'dragEnd' });
-    expect(b.state).toBe('fall');
-    run(b, 0.6);
+    expect(b.state).toBe('land');
+    run(b, 60);
+    expect(b.lift).toBe(300);
+    expect(b.x).toBe(400);
+    expect(b.state).not.toBe('walk');
+  });
+
+  it('dropped just above the floor, lands on it and can walk again', () => {
+    // rng: initial idle 5s; idle after landing 5s; then walk (0.1) to x=900 (0.9)
+    const b = new Behavior(cfg, 100, seq(0, 0, 0.1, 0.9));
+    b.dispatch({ type: 'dragStart' });
+    b.dispatch({ type: 'dragMove', x: 100, lift: 10 });
+    b.dispatch({ type: 'dragEnd' });
     expect(b.lift).toBe(0);
-    expect(b.drainEffects()).toContain('land');
-    run(b, 0.5);
-    expect(b.state).toBe('idle');
+    expect(b.drainEffects()).toEqual([]);
+    run(b, 6);
+    expect(b.state).toBe('walk');
   });
 
   it('cannot be interrupted by petting or celebrating while held', () => {

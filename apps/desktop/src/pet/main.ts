@@ -48,6 +48,29 @@ interface Geometry {
   maxX: number;
   /** Window top (logical px) when the pet stands on the floor. */
   floorTop: number;
+  /** Highest the pet can be perched (keeps it on screen). */
+  maxLift: number;
+}
+
+/** Where the user last put this pet, remembered across restarts. */
+const posKey = (id: string) => `deskpals:pos:${id}`;
+function loadPosition(id: string): { x: number; lift: number } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(posKey(id)) ?? 'null') as {
+      x: number;
+      lift: number;
+    } | null;
+    return v && Number.isFinite(v.x) && Number.isFinite(v.lift) ? v : null;
+  } catch {
+    return null;
+  }
+}
+function savePosition(id: string, x: number, lift: number) {
+  try {
+    localStorage.setItem(posKey(id), JSON.stringify({ x: Math.round(x), lift: Math.round(lift) }));
+  } catch {
+    // storage unavailable: the pet just starts somewhere new next time
+  }
 }
 
 function behaviorConfig(s: Settings, stayPut: boolean): BehaviorConfig {
@@ -79,14 +102,21 @@ async function geometry(): Promise<Geometry> {
   const m = (await currentMonitor()) ?? (await primaryMonitor());
   const w = window.innerWidth;
   const h = window.innerHeight;
-  if (!m) return { minX: 0, maxX: 800, floorTop: 600 };
+  if (!m) return { minX: 0, maxX: 800, floorTop: 600, maxLift: 500 };
   const sf = m.scaleFactor;
   const left = m.workArea.position.x / sf;
   const top = m.workArea.position.y / sf;
   const width = m.workArea.size.width / sf;
   const height = m.workArea.size.height / sf;
   // The window has transparent margins, so let it overhang the edges a little.
-  return { minX: left - w * 0.2, maxX: left + width - w * 0.8, floorTop: top + height - h };
+  const floorTop = top + height - h;
+  return {
+    minX: left - w * 0.2,
+    maxX: left + width - w * 0.8,
+    floorTop,
+    // let the transparent top margin go off-screen, but keep the pet itself visible
+    maxLift: Math.max(0, floorTop - top + h * 0.35),
+  };
 }
 
 const yesterday = () => localDay(new Date(Date.now() - 86_400_000));
@@ -105,10 +135,14 @@ async function main() {
 
   let geom = await geometry();
   const focus = new FocusTimer();
+  const saved = loadPosition(petId);
   const behavior = new Behavior(
     behaviorConfig(settings, false),
-    geom.minX + Math.random() * (geom.maxX - geom.minX),
+    saved
+      ? Math.min(geom.maxX, Math.max(geom.minX, saved.x))
+      : geom.minX + Math.random() * (geom.maxX - geom.minX),
   );
+  if (saved) behavior.lift = Math.min(geom.maxLift, Math.max(0, saved.lift));
   const applyConfig = () => behavior.setConfig(behaviorConfig(settings, focus.phase === 'focus'));
 
   // Only the first pet that's out runs reminders and the focus timer, so they don't double up.
@@ -198,7 +232,8 @@ async function main() {
     }
     // Cartoon frames are drawn facing right when walking and facing the viewer otherwise.
     view.setFlip(behavior.dir < 0 && (!expr || behavior.state === 'walk'));
-    view.setLift(behavior.lift);
+    // The shadow only lifts away while the pet is held; perched, it stands on an invisible ledge.
+    view.setLift(behavior.state === 'drag' ? behavior.lift + 200 : 0);
 
     if (expr) {
       const now = performance.now();
@@ -329,7 +364,9 @@ async function main() {
       void geometry().then((g) => {
         const top = geom.floorTop - behavior.lift;
         geom = g;
-        behavior.lift = Math.max(0, g.floorTop - top);
+        behavior.lift = Math.min(g.maxLift, Math.max(0, g.floorTop - top));
+        if (behavior.lift < 24) behavior.lift = 0;
+        savePosition(petId, behavior.x, behavior.lift);
       });
     } else {
       const now = performance.now();
@@ -658,6 +695,8 @@ async function main() {
     }
     if (prevState === 'wake' && behavior.state === 'idle')
       react('greet', pick(REACTIONS.greet), 0.6);
+    if (prevState === 'walk' && behavior.state !== 'walk')
+      savePosition(petId, behavior.x, behavior.lift);
     prevState = behavior.state;
 
     syncView();

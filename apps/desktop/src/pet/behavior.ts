@@ -38,6 +38,8 @@ export type BehaviorEvent =
 export type Effect = 'hearts' | 'bedtimeNudge' | 'land';
 
 export const GRAVITY = 2600; // px/s²
+/** Dropped closer than this to the floor, the pet lands on it instead of perching. */
+export const SNAP_TO_FLOOR = 24;
 const WAKE_SEC = 1.2;
 const LAND_SEC = 0.35;
 const PETTED_SEC = 1.6;
@@ -147,8 +149,10 @@ export class Behavior {
         break;
       case 'dragEnd':
         if (this.state !== 'drag') break;
+        // Stays wherever it's put. Dropped just above the floor, it hops down onto it.
+        if (this.lift < SNAP_TO_FLOOR) this.lift = 0;
         this.vy = 0;
-        this.enter(this.lift > 1 ? 'fall' : 'land');
+        this.enter('land');
         break;
       case 'pet':
         if (this.state === 'sleep') this.enter('wake');
@@ -194,8 +198,14 @@ export class Behavior {
     }
   }
 
+  /** Perched somewhere the user put it (not on the floor). */
+  get perched() {
+    return this.lift > 0;
+  }
+
   private chooseNext(world: World) {
-    if (this.cfg.stayPut) {
+    // Stays where it was put: perched pets and focus buddies don't wander off.
+    if (this.cfg.stayPut || this.perched) {
       this.enter('sit');
       return;
     }

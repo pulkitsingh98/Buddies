@@ -1,6 +1,7 @@
 import type { PetManifest } from '@deskpals/shared';
 import type { PetState } from './behavior';
 import { alignOffset, frameAnchor, type Anchor } from './anchor';
+import { bubblePalette, dominantHue } from './palette';
 import { poseTransform, restPose, type RestPose } from './pose';
 
 /** Hit grid resolution reported to Rust for click-through. */
@@ -33,6 +34,8 @@ export class PetView {
   private current: RestPose = restPose('idle', false);
   private flipped = false;
   private bubbleTimer: number | undefined;
+  private leaveTimer: number | undefined;
+  private typeTimer: number | undefined;
 
   constructor(
     private readonly sprite: ImageBitmap,
@@ -88,6 +91,20 @@ export class PetView {
     ctx.drawImage(this.sprite, 0, 0);
     const sheet = ctx.getImageData(0, 0, W, H).data;
     const anchors = new Map<string, Anchor>();
+    // Bubble colours follow the pet's signature colour.
+    const neutral = this.frames.neutral;
+    if (neutral) {
+      const px = ctx.getImageData(neutral.x, neutral.y, neutral.w, neutral.h).data;
+      const pal = bubblePalette(dominantHue(px));
+      const root = document.documentElement.style;
+      root.setProperty('--bubble-bg', pal.bg);
+      root.setProperty('--bubble-bg2', pal.bg2);
+      root.setProperty('--bubble-border', pal.border);
+      root.setProperty('--bubble-text', pal.text);
+      root.setProperty('--bubble-button', pal.button);
+      root.setProperty('--bubble-button-hover', pal.buttonHover);
+      root.setProperty('--bubble-accent', pal.accent);
+    }
     for (const [id, r] of Object.entries(this.frames)) {
       const alpha = new Uint8Array(r.w * r.h);
       for (let y = 0; y < r.h; y++) {
@@ -184,19 +201,20 @@ export class PetView {
   }
 
   /**
-   * Speech bubble above the pet. Clicking the bubble dismisses it; action buttons call back and
-   * dismiss. Returns a function that closes it.
+   * Speech bubble above the pet. Pops in from its tail, types the text, then shows any action
+   * buttons; clicking the bubble dismisses it ("poof"). Returns a function that closes it.
    */
   showBubble(
     text: string,
     opts: { ms?: number; actions?: BubbleAction[]; onTimeout?: () => void } = {},
   ) {
-    this.bubble.replaceChildren();
+    this.openBubble();
     const p = document.createElement('div');
-    p.textContent = text;
+    p.className = 'text';
     this.bubble.appendChild(p);
+    let row: HTMLDivElement | null = null;
     if (opts.actions?.length) {
-      const row = document.createElement('div');
+      row = document.createElement('div');
       row.className = 'actions';
       for (const a of opts.actions) {
         const b = document.createElement('button');
@@ -210,10 +228,8 @@ export class PetView {
       }
       this.bubble.appendChild(row);
     }
+    this.typeText(p, text, () => row?.classList.add('shown'));
     this.bubble.onclick = () => this.hideBubble();
-    this.bubble.hidden = false;
-    this.bubble.style.bottom = `${window.innerHeight - this.box.top + 8}px`;
-    clearTimeout(this.bubbleTimer);
     this.bubbleTimer = window.setTimeout(() => {
       this.hideBubble();
       opts.onTimeout?.();
@@ -232,8 +248,9 @@ export class PetView {
     onSend: (text: string) => void,
     onClose: () => void,
   ) {
-    this.bubble.replaceChildren();
+    this.openBubble();
     const label = document.createElement('div');
+    label.className = 'text';
     label.textContent = prompt;
     const form = document.createElement('form');
     form.className = 'reply';
@@ -262,9 +279,6 @@ export class PetView {
     cancel.onclick = close;
     input.onkeydown = (e) => e.key === 'Escape' && close();
     this.bubble.onclick = null;
-    this.bubble.hidden = false;
-    this.bubble.style.bottom = `${window.innerHeight - this.box.top + 8}px`;
-    clearTimeout(this.bubbleTimer);
     this.bubbleTimer = window.setTimeout(close, 90_000);
     this.onMaskChange?.();
     setTimeout(() => input.focus(), 50);
@@ -285,14 +299,61 @@ export class PetView {
   }
 
   get bubbleOpen() {
-    return !this.bubble.hidden;
+    return !this.bubble.hidden && !this.bubble.classList.contains('leaving');
   }
 
+  /** Clears the bubble and restarts its pop-in animation. */
+  private openBubble() {
+    clearTimeout(this.bubbleTimer);
+    clearTimeout(this.leaveTimer);
+    clearInterval(this.typeTimer);
+    this.bubble.replaceChildren();
+    this.bubble.classList.remove('leaving', 'entering');
+    void this.bubble.offsetWidth; // restart the CSS animation
+    this.bubble.classList.add('entering');
+    this.bubble.hidden = false;
+    this.bubble.style.bottom = `${window.innerHeight - this.box.top + 8}px`;
+  }
+
+  /** Types the text in over about a second (instantly with reduced motion). */
+  private typeText(el: HTMLElement, text: string, done: () => void) {
+    const chars = Array.from(text);
+    const reduced =
+      document.documentElement.classList.contains('reduced') ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.textContent = text;
+    if (reduced || chars.length < 3) {
+      done();
+      return;
+    }
+    // Reserve the final size so the bubble doesn't grow while typing.
+    el.style.minHeight = `${el.offsetHeight}px`;
+    el.style.minWidth = `${el.offsetWidth}px`;
+    el.textContent = '';
+    let i = 0;
+    const perTick = Math.max(1, Math.ceil(chars.length / 40));
+    this.typeTimer = window.setInterval(() => {
+      i = Math.min(chars.length, i + perTick);
+      el.textContent = chars.slice(0, i).join('');
+      if (i >= chars.length) {
+        clearInterval(this.typeTimer);
+        done();
+      }
+    }, 28);
+  }
+
+  /** Floats the bubble up and fades it ("poof"), then hides it. */
   private hideBubble() {
     clearTimeout(this.bubbleTimer);
-    if (this.bubble.hidden) return;
-    this.bubble.hidden = true;
-    this.onMaskChange?.();
+    clearInterval(this.typeTimer);
+    if (this.bubble.hidden || this.bubble.classList.contains('leaving')) return;
+    this.bubble.classList.remove('entering');
+    this.bubble.classList.add('leaving');
+    this.leaveTimer = window.setTimeout(() => {
+      this.bubble.hidden = true;
+      this.bubble.classList.remove('leaving');
+      this.onMaskChange?.();
+    }, 260);
   }
 
   /** Called when something other than the pose changes the clickable area. */

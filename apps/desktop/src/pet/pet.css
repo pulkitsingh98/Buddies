@@ -194,73 +194,135 @@ body {
   }
 }
 
-/* ---- speech bubble ---- */
+/* ---- speech bubble (colours come from the pet: see palette.ts) ---- */
+:root {
+  --bubble-bg: hsl(22 100% 97%);
+  --bubble-bg2: hsl(47 90% 93%);
+  --bubble-border: hsl(22 70% 78%);
+  --bubble-text: hsl(22 35% 22%);
+  --bubble-button: hsl(22 90% 90%);
+  --bubble-button-hover: hsl(22 90% 84%);
+  --bubble-accent: hsl(22 70% 55%);
+}
 #bubble {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  translate: -50% 0;
   max-width: calc(100% - 12px);
   box-sizing: border-box;
-  padding: 7px 10px;
-  border-radius: 14px;
-  background: #fff;
-  color: #2b2320;
+  padding: 8px 12px 9px;
+  border-radius: 18px;
+  border: 2px solid var(--bubble-border);
+  background: linear-gradient(160deg, var(--bubble-bg) 0%, var(--bubble-bg2) 100%);
+  color: var(--bubble-text);
   font-size: 13px;
-  line-height: 1.3;
+  font-weight: 500;
+  line-height: 1.35;
   text-align: center;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+  box-shadow:
+    0 3px 0 var(--bubble-border),
+    0 6px 14px rgb(0 0 0 / 0.14);
+  transform-origin: 50% calc(100% + 10px);
+}
+#bubble::before {
+  /* tiny sparkle in the corner */
+  content: '✦';
+  position: absolute;
+  top: -9px;
+  right: 8px;
+  font-size: 12px;
+  color: var(--bubble-accent);
+  animation: twinkle 1.8s ease-in-out infinite;
+}
+#bubble::after {
+  /* rounded tail pointing at the pet */
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: var(--bubble-bg2);
+  border-right: 2px solid var(--bubble-border);
+  border-bottom: 2px solid var(--bubble-border);
+  border-bottom-right-radius: 4px;
+  transform: rotate(45deg);
+}
+#bubble .text {
+  white-space: pre-wrap;
+}
+#bubble.entering {
+  animation: bubble-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+#bubble.leaving {
+  animation: bubble-out 0.26s ease-in both;
+}
+@keyframes bubble-in {
+  0% {
+    transform: scale(0.2) rotate(-6deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06) rotate(1.5deg);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.97) rotate(-0.5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes bubble-out {
+  to {
+    transform: translateY(-14px) scale(0.85);
+    opacity: 0;
+  }
+}
+@keyframes twinkle {
+  50% {
+    transform: scale(1.35) rotate(20deg);
+    opacity: 0.6;
+  }
 }
 #bubble .actions {
   display: flex;
   gap: 6px;
   justify-content: center;
-  margin-top: 6px;
+  margin-top: 7px;
   flex-wrap: wrap;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
+}
+#bubble .actions.shown {
+  opacity: 1;
+  transform: none;
 }
 #bubble button {
   font: inherit;
   font-size: 12px;
-  padding: 3px 9px;
-  border-radius: 10px;
-  border: 1px solid #eadfd8;
-  background: #fff7f1;
-  color: #2b2320;
+  font-weight: 600;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1.5px solid var(--bubble-border);
+  background: var(--bubble-button);
+  color: var(--bubble-text);
   cursor: pointer;
+  transition:
+    transform 0.12s,
+    background 0.12s;
 }
 #bubble button:hover {
-  background: #ffe6d6;
+  background: var(--bubble-button-hover);
+  transform: translateY(-1px) scale(1.05);
 }
-#bubble::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -6px;
-  margin-left: -6px;
-  border: 6px solid transparent;
-  border-bottom: 0;
-  border-top-color: #fff;
+#bubble button:active {
+  transform: scale(0.95);
 }
-
-/* ---- focus badge ---- */
-#badge {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: #2b2320;
-  color: #fff;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
-}
-#badge[hidden],
-#bubble[hidden] {
-  display: none;
-}
-
-/* ---- reply box ---- */
 #bubble form.reply {
   display: flex;
   gap: 4px;
@@ -271,7 +333,46 @@ body {
   font-size: 12px;
   flex: 1;
   min-width: 0;
-  padding: 4px 6px;
-  border-radius: 8px;
-  border: 1px solid #eadfd8;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--bubble-border);
+  background: #fff;
+  color: var(--bubble-text);
+  outline: none;
+}
+#bubble form.reply input:focus {
+  border-color: var(--bubble-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  #bubble.entering,
+  #bubble.leaving,
+  #bubble::before {
+    animation-duration: 0.01s;
+  }
+}
+.reduced #bubble.entering,
+.reduced #bubble.leaving,
+.reduced #bubble::before {
+  animation-duration: 0.01s;
+}
+
+/* ---- focus badge ---- */
+#badge {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--bubble-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid var(--bubble-bg);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+}
+#badge[hidden],
+#bubble[hidden] {
+  display: none;
 }
