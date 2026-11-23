@@ -1,6 +1,6 @@
 [package]
 name = "deskpals"
-version = "0.1.0"
+version = "0.2.0"
 description = "Photo-to-desktop-pet app"
 edition = "2021"
 rust-version = "1.85"
