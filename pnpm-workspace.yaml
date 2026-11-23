@@ -1,3 +1,7 @@
 packages:
   - apps/*
   - packages/*
+
+# Install scripts we deliberately skip (protobufjs only prints a notice; ort-web needs no build).
+allowBuilds:
+  protobufjs: false
