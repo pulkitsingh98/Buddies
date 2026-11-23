@@ -169,6 +169,16 @@ body {
   transition: transform 0.08s;
 }
 
+/* ---- guided breathing ---- */
+#stage.breath-in #pop {
+  transform: scale(1.12);
+  transition: transform 4s ease-in-out;
+}
+#stage.breath-out #pop {
+  transform: scale(1);
+  transition: transform 5s ease-in-out;
+}
+
 /* ---- hearts ---- */
 .heart {
   position: absolute;

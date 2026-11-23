@@ -24,6 +24,8 @@ export interface WellbeingState {
   next: Partial<Record<ReminderKind, number>>;
   goodMessageDay?: string;
   moodDay?: string;
+  /** Day of the (sometimes) evening check-in decision. */
+  moodEveningDay?: string;
   mood?: string;
   nextCompliment?: number;
   focusSessionsToday: number;
@@ -115,6 +117,11 @@ export class Wellbeing {
     if (this.cfg.moodCheckin && this.state.moodDay !== ctx.day && ctx.hour >= 12) {
       this.state.moodDay = ctx.day;
       return { type: 'mood' };
+    }
+    // Sometimes the pet checks in again in the evening (about half the days).
+    if (this.cfg.moodCheckin && this.state.moodEveningDay !== ctx.day && ctx.hour >= 18) {
+      this.state.moodEveningDay = ctx.day;
+      if (this.rng() < 0.5) return { type: 'mood' };
     }
     if (this.cfg.compliments && now >= (this.state.nextCompliment ?? Infinity)) {
       this.state.nextCompliment = now + this.complimentGap();

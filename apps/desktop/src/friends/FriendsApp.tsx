@@ -357,12 +357,15 @@ function FriendRow({ friend, online }: { friend: Friend; online: boolean }) {
                 <div key={m.id} className={`msg ${m.sender_id === friend.user_id ? '' : 'mine'}`}>
                   {m.type === 'message' || m.body
                     ? m.body
-                    : ({
-                        visit: '🐾 visit',
-                        nudge: '👉 nudge',
-                        heart: '💕',
-                        hangout_invite: '🎈 hang out?',
-                      }[m.type] ?? m.type)}
+                    : ((
+                        {
+                          visit: '🐾 visit',
+                          nudge: '👉 nudge',
+                          heart: '💕',
+                          hangout_invite: '🎈 hang out?',
+                          mood: '💭 mood',
+                        } as Record<string, string>
+                      )[m.type] ?? m.type)}
                 </div>
               ))}
             </div>

@@ -284,6 +284,12 @@ export class PetView {
     setTimeout(() => input.focus(), 50);
   }
 
+  /** Guided breathing: the pet slowly grows on the in-breath and settles on the out-breath. */
+  setBreath(phase: 'in' | 'hold' | 'out' | null) {
+    this.stage.classList.toggle('breath-in', phase === 'in' || phase === 'hold');
+    this.stage.classList.toggle('breath-out', phase === 'out');
+  }
+
   /** Small pill above the pet (focus countdown). `null` hides it. */
   setBadge(text: string | null, onClick?: () => void) {
     const visible = text !== null;

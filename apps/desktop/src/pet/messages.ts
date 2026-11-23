@@ -287,14 +287,6 @@ export const REACTIONS = {
   wake: ['Huh? Oh! Hi! 😊', '*yawn* Good to see you'],
 } as const;
 
-export const MOODS = [
-  { emoji: '😄', reply: 'Love that for you! Let’s keep it going.' },
-  { emoji: '🙂', reply: 'Nice and steady. Good day ahead.' },
-  { emoji: '😐', reply: 'Fair enough. Want a stretch or some water?' },
-  { emoji: '😔', reply: 'I’m sorry it’s a heavy day. I’m right here 🫂' },
-  { emoji: '😫', reply: 'That sounds rough. Be extra gentle with yourself today.' },
-] as const;
-
 export function pick<T>(list: readonly T[]): T {
   return list[Math.floor(Math.random() * list.length)] as T;
 }

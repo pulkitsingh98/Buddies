@@ -132,6 +132,9 @@ isOneToOne: false
 "block_user":
 { Args: { "target": string }; Returns: undefined
                            },
+"clear_mood":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "consume_generation_quota":
 { Args: { "p_kind": string }; Returns: undefined
                            },
@@ -155,12 +158,15 @@ isOneToOne: false
 "send_interaction":
 { Args: { "kind": Database["public"]['Enums']["interaction_type"],"message"?: string,"pet"?: string,"recipient": string }; Returns: string
                            },
+"share_mood":
+{ Args: { "emoji": string,"label": string }; Returns: number
+                           },
 "unblock_user":
 { Args: { "target": string }; Returns: undefined
                            }
           }
           Enums: {
-            "friendship_status": "pending"|"accepted"|"blocked","interaction_type": "visit"|"nudge"|"heart"|"message"|"hangout_invite"
+            "friendship_status": "pending"|"accepted"|"blocked","interaction_type": "visit"|"nudge"|"heart"|"message"|"hangout_invite"|"mood"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -280,7 +286,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "friendship_status": ["pending", "accepted", "blocked"],"interaction_type": ["visit", "nudge", "heart", "message", "hangout_invite"]
+            "friendship_status": ["pending", "accepted", "blocked"],"interaction_type": ["visit", "nudge", "heart", "message", "hangout_invite", "mood"]
           }
         }
 } as const

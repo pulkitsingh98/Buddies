@@ -88,6 +88,16 @@ describe('daily things', () => {
     expect(w.next(ctx(4, { hour: 9, day: '2026-11-24' }))).toEqual({ type: 'goodMessage' });
   });
 
+  it('sometimes checks in again in the evening', () => {
+    const yes = new Wellbeing(cfg({ moodCheckin: true }), emptyState('2026-11-23'), () => 0.2);
+    expect(yes.next(ctx(1, { hour: 13 }))).toEqual({ type: 'mood' });
+    expect(yes.next(ctx(2, { hour: 19 }))).toEqual({ type: 'mood' });
+    expect(yes.next(ctx(3, { hour: 20 }))).toBeNull();
+    const no = new Wellbeing(cfg({ moodCheckin: true }), emptyState('2026-11-23'), () => 0.9);
+    no.next(ctx(1, { hour: 13 }));
+    expect(no.next(ctx(2, { hour: 19 }))).toBeNull();
+  });
+
   it('resets water count at midnight and tracks a focus streak', () => {
     const w = new Wellbeing(cfg(), emptyState('2026-11-23'));
     w.done('water', 0);

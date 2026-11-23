@@ -14,6 +14,7 @@ const ITEMS: &[(&str, &str)] = &[
     ("new_pet", "New Pet…"),
     ("toggle_pets", "Show / Hide Pets"),
     ("focus", "Start Focus Timer"),
+    ("mood", "How Am I Feeling?"),
     ("tidy", "Tidy Desktop…"),
     ("friends", "Friends…"),
     ("settings", "Settings…"),

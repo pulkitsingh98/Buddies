@@ -71,6 +71,11 @@ export const blockUser = async (id: string) =>
 export const unblockUser = async (id: string) =>
   check(await client().rpc('unblock_user', { target: id }));
 
+/** Sets my mood and (at most every 30 min) tells my friends' pets. */
+export const shareMood = async (emoji: string, label: string) =>
+  check(await client().rpc('share_mood', { emoji, label }));
+export const clearMood = async () => check(await client().rpc('clear_mood'));
+
 export async function send(
   recipient: string,
   kind: InteractionType,

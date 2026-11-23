@@ -37,6 +37,11 @@ export class Expressions {
     this.nextQuirk = now + 20 + rng() * 25;
   }
 
+  /** Shows a specific frame for a while (e.g. the face matching a mood). */
+  hold(frame: CartoonFrame, now: number, seconds: number) {
+    this.set(frame, now, seconds);
+  }
+
   react(kind: Reaction, now: number) {
     const pick = (...frames: CartoonFrame[]) =>
       frames[Math.floor(this.rng() * frames.length)] ?? 'happy';

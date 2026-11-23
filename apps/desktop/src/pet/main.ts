@@ -17,12 +17,20 @@ import {
   COMPLIMENTS,
   EYE_LINES,
   GOOD_MESSAGES,
-  MOODS,
   pick,
   REACTIONS,
   STRETCH_TIPS,
   WATER_LINES,
 } from './messages';
+import {
+  breathingSteps,
+  JOKES,
+  MOODS,
+  moodFromText,
+  type Mood,
+  type MoodOption,
+  type MoodStep,
+} from './moods';
 import { tickHz } from './pose';
 import { MASK_COLS, MASK_ROWS, PetView, type BubbleAction } from './view';
 import {
@@ -452,24 +460,113 @@ async function main() {
         react('hover', pick(COMPLIMENTS));
         break;
       case 'mood':
-        ask(
-          'How are you feeling today?',
-          MOODS.map((m) => ({
-            label: m.emoji,
-            onClick: () => {
-              wellbeing.setMood(m.emoji);
-              void emit(EVENTS.mood, { emoji: m.emoji });
-              saveWellbeing();
-              react(m.emoji === '😔' || m.emoji === '😫' ? 'hover' : 'click');
-              say(m.reply, 5000);
-            },
-          })),
-          45_000,
-        );
+        askMood();
         break;
     }
     saveWellbeing();
   };
+
+  // --- mood check-in: a small decision tree (see moods.ts) ---
+  const later = (ms: number) => new Promise<void>((r) => window.setTimeout(r, ms));
+  const breathe = async () => {
+    for (const step of breathingSteps()) {
+      view.setBreath(step.phase);
+      bubbleIsTask = true;
+      view.showBubble(step.text, { ms: step.seconds * 1000 + 400 });
+      await later(step.seconds * 1000);
+    }
+    view.setBreath(null);
+    bubbleIsTask = false;
+    say('Well done 💛', 2500);
+    await later(2600);
+  };
+  const runAction = async (option: MoodOption) => {
+    switch (option.action) {
+      case 'celebrate':
+        behavior.dispatch({ type: 'celebrate' });
+        break;
+      case 'hearts':
+      case 'stayClose':
+        view.addHearts(8);
+        react('hover');
+        break;
+      case 'breathe':
+        await breathe();
+        return;
+      case 'stretch':
+        say(`Stretch with me 🙆 ${pick(STRETCH_TIPS)}`, 9000);
+        await later(9000);
+        return;
+      case 'break':
+        startBreak();
+        break;
+      case 'focus':
+        if (focus.phase === 'idle') startFocus();
+        break;
+      case 'water':
+        view.addHearts(3);
+        break;
+      case 'joke':
+        react('click');
+        say(pick(JOKES), 9000);
+        await later(9000);
+        return;
+      case 'friends':
+        void ipc.openFriends();
+        break;
+      case 'compliment':
+        react('hover');
+        say(pick(COMPLIMENTS), 6000);
+        await later(6000);
+        return;
+      default:
+        break;
+    }
+    wake();
+  };
+  const askStep = (mood: Mood, step: MoodStep) => {
+    ask(
+      step.question,
+      step.options.map((o) => ({
+        label: o.label,
+        onClick: () =>
+          void (async () => {
+            interacted();
+            if (o.reply) {
+              say(o.reply, 5000);
+              await later(o.action || o.next ? 2800 : 0);
+            }
+            await runAction(o);
+            if (o.next) askStep(mood, o.next);
+          })(),
+      })),
+      45_000,
+    );
+  };
+  const askMood = () => {
+    ask(
+      'How are you feeling?',
+      MOODS.map((m) => ({
+        label: m.emoji,
+        onClick: () => {
+          interacted();
+          wellbeing.setMood(m.emoji);
+          saveWellbeing();
+          void emit(EVENTS.mood, { emoji: m.emoji, label: m.label });
+          expr?.hold(m.frame, performance.now() / 1000, 6);
+          view.pop();
+          if (m.valence === 'positive') behavior.dispatch({ type: 'celebrate' });
+          say(m.reaction, 2600);
+          window.setTimeout(() => askStep(m, m.step), 2700);
+          wake();
+        },
+      })),
+      60_000,
+    );
+  };
+  void listen('tray://mood', () => {
+    if (isPrimary()) askMood();
+  });
 
   let nextWellbeingCheck = 0;
   let lastLonelyLine = 0;
@@ -638,6 +735,38 @@ async function main() {
           60_000,
         );
         break;
+      case 'mood': {
+        const mood = moodFromText(it.body ?? '');
+        const feeling = it.body ?? 'something';
+        if (mood?.valence === 'negative') {
+          expr?.hold('sad', performance.now() / 1000, 4);
+          ask(
+            `${name} is feeling ${feeling} 💛 Send some love?`,
+            [
+              {
+                label: '🫂 Send a hug',
+                onClick: () => sendBack(it.sender_id, 'heart', 'Hug sent 🫂'),
+              },
+              { label: '✉️ Message', onClick: () => void replyTo(it.sender_id, name) },
+            ],
+            60_000,
+          );
+        } else {
+          react(mood?.valence === 'positive' ? 'click' : 'greet');
+          ask(
+            `${name} is feeling ${feeling}!`,
+            [
+              {
+                label: mood?.valence === 'positive' ? '🎉 Cheer' : '💕 Send love',
+                onClick: () => sendBack(it.sender_id, 'heart', 'Sent 💕'),
+              },
+              { label: '✉️ Message', onClick: () => void replyTo(it.sender_id, name) },
+            ],
+            30_000,
+          );
+        }
+        break;
+      }
       default:
         break;
     }

@@ -14,7 +14,8 @@ import {
   markDelivered,
   myProfile,
   syncPets,
-  updateProfile,
+  clearMood,
+  shareMood,
   type IncomingEvent,
   type Interaction,
   type SocialState,
@@ -63,6 +64,7 @@ async function deliver(it: Interaction) {
       };
       await emit(EVENTS.incoming, payload);
       await markDelivered(it.id);
+      if (it.type === 'mood') void refreshFriends(); // their mood changed in the list
     }
   } finally {
     // Allow a retry later if something failed before it was marked.
@@ -175,15 +177,15 @@ if (supabase) {
 
 void listen(EVENTS.requestState, broadcast);
 void listen(EVENTS.refresh, () => void refreshFriends());
-void listen<{ emoji: string }>(EVENTS.mood, (e) => {
+void listen<{ emoji: string; label: string }>(EVENTS.mood, (e) => {
   if (session && settings?.shareMood)
-    void updateProfile({ mood_emoji: e.payload.emoji, mood_shared: true });
+    void shareMood(e.payload.emoji, e.payload.label).catch(() => {});
 });
 void listen<Settings>('settings://changed', (e) => {
   const wasDnd = settings?.doNotDisturb;
   settings = e.payload;
   if (session) {
-    if (!settings.shareMood) void updateProfile({ mood_emoji: null, mood_shared: false });
+    if (!settings.shareMood) void clearMood().catch(() => {});
     void syncPets().catch(() => {});
     if (wasDnd && !settings.doNotDisturb) void flushQueue();
   }
