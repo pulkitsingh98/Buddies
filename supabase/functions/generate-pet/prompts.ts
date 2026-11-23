@@ -7,7 +7,8 @@ export const STYLE = [
   'clean bold dark outlines, flat cel shading with soft highlights, warm vibrant colours.',
   'Full body, centred, the whole character visible with a small margin, feet near the bottom edge.',
   'Keep exactly the same character design, proportions, colours, size and framing as the reference.',
-  'Transparent background. No ground shadow, no scenery, no text, no border, no watermark.',
+  'Solid flat pure green (#00FF00) background filling the whole image, like a green screen.',
+  'No green on the character. No ground shadow, no scenery, no text, no border, no watermark.',
 ].join(' ');
 
 const GESTURE_NOTE =
@@ -20,7 +21,7 @@ export function characterPrompt(kind: string): string {
       : kind === 'animal'
         ? 'the animal in this photo into a cute cartoon character, keeping its breed/species, fur or feather colours, markings and any collar or accessories'
         : 'the person in this photo into a cute cartoon character that is clearly recognisable as them, keeping their hair colour and style, skin tone, face shape, glasses, facial hair, clothing colours and accessories';
-  return `Turn ${subject}. ${STYLE} Standing, facing the viewer, neutral gentle smile, relaxed pose.`;
+  return `Using image 0 as reference, turn ${subject}. ${STYLE} Standing, facing the viewer, neutral gentle smile, relaxed pose.`;
 }
 
 const FRAMES = {
@@ -51,5 +52,5 @@ export type FrameId = keyof typeof FRAMES;
 export const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
 
 export function framePrompt(id: FrameId): string {
-  return `This is the same cartoon character as the reference image. ${FRAMES[id]} ${GESTURE_NOTE} ${STYLE}`;
+  return `Redraw the cartoon character from image 0. ${FRAMES[id]} ${GESTURE_NOTE} ${STYLE}`;
 }

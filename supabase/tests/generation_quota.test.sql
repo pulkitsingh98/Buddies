@@ -15,7 +15,7 @@ select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-3333333
 
 select lives_ok($$select public.consume_generation_quota('character')$$, 'signed-in user can spend quota');
 select throws_ok(
-  $$select public.consume_generation_quota('character') from generate_series(1, 6)$$,
+  $$select public.consume_generation_quota('character') from generate_series(1, 4)$$,
   'P0001', 'daily pet-making limit reached, try again tomorrow', 'limit is enforced');
 
 select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}', true);

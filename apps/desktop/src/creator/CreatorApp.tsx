@@ -38,7 +38,7 @@ type Style = 'cartoon' | 'cutout';
 
 const remover = new OnDeviceRemover();
 const cutoutGenerator: PetGenerator = new CutoutGenerator();
-const cartoonGenerator: PetGenerator = new CartoonGenerator();
+const cartoonGenerator: PetGenerator = new CartoonGenerator(remover);
 
 export function CreatorApp() {
   const [step, setStep] = useState<Step>({ kind: 'pick' });
@@ -188,11 +188,11 @@ export function CreatorApp() {
           </div>
           <p className="muted small">
             {style === 'cartoon'
-              ? 'Redraws your photo as a cartoon character with 18 expressions and poses — laughs, blushes, sulks, waves, sleeps. Takes a few minutes; your photo is sent once to the image service and not stored.'
+              ? 'Redraws your photo as a cartoon character with 18 expressions and poses — laughs, blushes, sulks, waves, sleeps. Free (uses a daily free allowance, about 4 pets a day). Takes a few minutes; your photo is sent once to the drawing service and not stored.'
               : 'Animates your actual photo with the background removed. Free, works offline, and the photo never leaves this computer.'}
           </p>
           {needsSignIn && session === null && (
-            <SignIn reason="Cartoon pets are drawn by an AI service, so they need a (free) sign-in. You can make up to 6 a day." />
+            <SignIn reason="Cartoon pets are drawn by a free AI service shared by everyone in DeskPals, so they need a (free) sign-in. Up to 4 a day each." />
           )}
           <h2>What is it?</h2>
           <div className="kinds">

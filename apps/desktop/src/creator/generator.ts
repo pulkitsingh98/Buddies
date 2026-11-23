@@ -2,7 +2,8 @@ import { CARTOON_FRAMES, type PetKind, type PetManifest, type PetStyle } from '@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { gridLayout, unionBounds } from './atlas';
-import { outline, pad, trim, type RawImage } from './stylize';
+import type { BackgroundRemover } from './remover';
+import { coverage, outline, pad, removeKeyedBackground, trim, type RawImage } from './stylize';
 
 export interface PetGeneratorInput {
   name: string;
@@ -83,12 +84,26 @@ const PARALLEL = 4;
 const RETRIES = 2;
 
 /**
- * Cartoon style: an image model redraws the photo as a character, then draws it again in every
- * expression/pose of {@link CARTOON_FRAMES}, using the first drawing as the reference.
- * Runs in the `generate-pet` Edge Function (the API key never reaches the app).
+ * Cartoon style: an image model (FLUX.2 on Cloudflare's free tier) redraws the photo as a
+ * character, then draws it again in every expression/pose of {@link CARTOON_FRAMES}, using the
+ * first drawing as the reference. Runs in the `generate-pet` Edge Function (the API token never
+ * reaches the app). Frames arrive on a green screen, which is removed here on-device.
  */
 export class CartoonGenerator implements PetGenerator {
   readonly style = 'stylized' as const;
+
+  /** @param fallbackRemover on-device AI remover for frames the green-screen key can't handle */
+  constructor(private readonly fallbackRemover?: BackgroundRemover) {}
+
+  /** Green-screen key, falling back to the AI remover when the result looks wrong. */
+  private async cutOut(dataUrl: string): Promise<RawImage> {
+    const raw = await decodeDataUrl(dataUrl);
+    const keyed = removeKeyedBackground(raw);
+    const c = coverage(keyed);
+    if ((c > 0.03 && c < 0.9) || !this.fallbackRemover) return keyed;
+    const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
+    return this.fallbackRemover.removeBackground(bitmap, () => {});
+  }
 
   async generate(
     input: PetGeneratorInput,
@@ -104,7 +119,8 @@ export class CartoonGenerator implements PetGenerator {
       kind: input.kind,
       photo: photoDataUrl(input.photo),
     });
-    progress.previews.neutral = base;
+    const cut: Record<string, RawImage> = { neutral: await this.cutOut(base) };
+    progress.previews.neutral = await toPngDataUrl(cut.neutral ?? (await decodeDataUrl(base)));
     report();
 
     // Remaining frames, a few at a time, each referencing the base drawing.
@@ -114,11 +130,10 @@ export class CartoonGenerator implements PetGenerator {
       for (let frame = queue.shift(); frame && !fatal; frame = queue.shift()) {
         for (let attempt = 0; ; attempt++) {
           try {
-            progress.previews[frame] = await callGenerator({
-              mode: 'frame',
-              frame,
-              reference: base,
-            });
+            const drawn = await callGenerator({ mode: 'frame', frame, reference: base });
+            const img = await this.cutOut(drawn);
+            cut[frame] = img;
+            progress.previews[frame] = await toPngDataUrl(img);
             break;
           } catch (e) {
             if (e instanceof QuotaError) fatal = e;
@@ -135,8 +150,8 @@ export class CartoonGenerator implements PetGenerator {
     if (fatal) throw fatal;
 
     // Shared framing for every frame, then pack into one sprite sheet.
-    const ids = Object.keys(progress.previews);
-    const images = await Promise.all(ids.map((id) => decodeDataUrl(progress.previews[id] ?? '')));
+    const ids = CARTOON_FRAMES.filter((f) => cut[f]);
+    const images = ids.map((id) => cut[id] as RawImage);
     const bounds = unionBounds(images);
     if (!bounds) throw new Error('The generated images were empty. Please try again.');
     const scale = Math.min(1, CELL_H / bounds.h);
@@ -201,6 +216,16 @@ function photoDataUrl(photo: ImageBitmap): string {
   c.height = Math.round(photo.height * s);
   c.getContext('2d')?.drawImage(photo, 0, 0, c.width, c.height);
   return c.toDataURL('image/jpeg', 0.9);
+}
+
+async function toPngDataUrl(img: RawImage): Promise<string> {
+  const blob = await toPng(img);
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error('could not encode preview'));
+    r.readAsDataURL(blob);
+  });
 }
 
 async function decodeDataUrl(url: string): Promise<RawImage> {

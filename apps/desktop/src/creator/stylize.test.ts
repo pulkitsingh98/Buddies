@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { adjustEdge, distanceTransform, outline, pad, trim, type RawImage } from './stylize';
+import {
+  adjustEdge,
+  distanceTransform,
+  outline,
+  pad,
+  removeKeyedBackground,
+  trim,
+  type RawImage,
+} from './stylize';
 
 /** w×h transparent image with an opaque red square [x0,x1)×[y0,y1). */
 function square(w: number, h: number, x0: number, y0: number, x1: number, y1: number): RawImage {
@@ -54,5 +62,31 @@ describe('trim', () => {
   });
   it('returns null for an empty image', () => {
     expect(trim(square(5, 5, 0, 0, 0, 0))).toBeNull();
+  });
+});
+
+describe('removeKeyedBackground', () => {
+  /** 20×20 green image with a dark-outlined red square, and a green patch inside it. */
+  function greenScreen(): RawImage {
+    const w = 20;
+    const data = new Uint8ClampedArray(w * w * 4);
+    for (let i = 0; i < w * w; i++) data.set([0, 255, 0, 255], i * 4);
+    for (let y = 5; y < 15; y++)
+      for (let x = 5; x < 15; x++) {
+        const edge = x === 5 || x === 14 || y === 5 || y === 14;
+        data.set(edge ? [20, 20, 20, 255] : [220, 40, 40, 255], (y * w + x) * 4);
+      }
+    for (let y = 9; y < 11; y++)
+      for (let x = 9; x < 11; x++) data.set([0, 255, 0, 255], (y * w + x) * 4);
+    return { width: w, height: w, data };
+  }
+
+  it('clears the connected backdrop but keeps the character, including enclosed green', () => {
+    const out = removeKeyedBackground(greenScreen());
+    expect(alpha(out, 0, 0)).toBe(0);
+    expect(alpha(out, 3, 10)).toBe(0);
+    expect(alpha(out, 8, 8)).toBe(255);
+    expect(alpha(out, 9, 9)).toBe(255); // enclosed green patch is part of the character
+    expect(alpha(out, 5, 10)).toBeGreaterThan(0); // outline kept (softened edge)
   });
 });

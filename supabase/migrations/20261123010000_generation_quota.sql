@@ -26,9 +26,9 @@ set search_path = ''
 as $$
 declare
   uid uuid := auth.uid();
-  max_characters constant int := 6;
-  -- 18 frames per pet, plus headroom for retries
-  max_frames constant int := 140;
+  max_characters constant int := 4;
+  -- 17 frames per pet plus retries. Also keeps us inside Cloudflare's free daily allowance.
+  max_frames constant int := 90;
   row public.generation_usage;
 begin
   if uid is null then

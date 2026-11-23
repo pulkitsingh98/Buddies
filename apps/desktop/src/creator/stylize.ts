@@ -165,3 +165,86 @@ export function coverage(img: RawImage): number {
   for (let i = 3; i < img.data.length; i += 4) if ((img.data[i] ?? 0) > 127) n++;
   return n / (img.width * img.height);
 }
+
+/**
+ * Removes a solid "green screen" background: estimates the backdrop colour from the image border,
+ * flood-fills everything similar that touches the border, softens the edge by one pixel and
+ * removes green spill. Interior regions are kept even if similar, since they don't touch the border.
+ */
+export function removeKeyedBackground(img: RawImage, tolerance = 90): RawImage {
+  const { width: w, height: h, data: src } = img;
+  const n = w * h;
+  // Backdrop colour = per-channel median of border pixels.
+  const border: number[][] = [[], [], []];
+  const sample = (i: number) => {
+    for (let c = 0; c < 3; c++) border[c]?.push(src[i * 4 + c] ?? 0);
+  };
+  for (let x = 0; x < w; x++) {
+    sample(x);
+    sample((h - 1) * w + x);
+  }
+  for (let y = 0; y < h; y++) {
+    sample(y * w);
+    sample(y * w + w - 1);
+  }
+  const key = border.map((ch) => {
+    ch.sort((a, b) => a - b);
+    return ch[ch.length >> 1] ?? 0;
+  });
+  const dist = (i: number) =>
+    Math.hypot(
+      (src[i * 4] ?? 0) - (key[0] ?? 0),
+      (src[i * 4 + 1] ?? 0) - (key[1] ?? 0),
+      (src[i * 4 + 2] ?? 0) - (key[2] ?? 0),
+    );
+
+  const bg = new Uint8Array(n);
+  const stack: number[] = [];
+  const push = (i: number) => {
+    if (!bg[i] && dist(i) < tolerance) {
+      bg[i] = 1;
+      stack.push(i);
+    }
+  };
+  for (let x = 0; x < w; x++) {
+    push(x);
+    push((h - 1) * w + x);
+  }
+  for (let y = 0; y < h; y++) {
+    push(y * w);
+    push(y * w + w - 1);
+  }
+  while (stack.length) {
+    const i = stack.pop() ?? 0;
+    const x = i % w;
+    if (x > 0) push(i - 1);
+    if (x < w - 1) push(i + 1);
+    if (i >= w) push(i - w);
+    if (i < n - w) push(i + w);
+  }
+
+  const data = new Uint8ClampedArray(src);
+  const greenKey = (key[1] ?? 0) > (key[0] ?? 0) && (key[1] ?? 0) > (key[2] ?? 0);
+  for (let i = 0; i < n; i++) {
+    if (bg[i]) {
+      data[i * 4 + 3] = 0;
+      continue;
+    }
+    const x = i % w;
+    const nearBg =
+      (x > 0 && bg[i - 1]) ||
+      (x < w - 1 && bg[i + 1]) ||
+      (i >= w && bg[i - w]) ||
+      (i < n - w && bg[i + w]);
+    if (!nearBg) continue;
+    // Edge pixel: partially transparent if it is still close to the backdrop colour.
+    const a = Math.max(0, Math.min(1, (dist(i) - tolerance) / tolerance));
+    data[i * 4 + 3] = Math.round((0.35 + 0.65 * a) * 255);
+    if (greenKey) {
+      const r = data[i * 4] ?? 0;
+      const b = data[i * 4 + 2] ?? 0;
+      data[i * 4 + 1] = Math.min(data[i * 4 + 1] ?? 0, Math.max(r, b));
+    }
+  }
+  return { width: w, height: h, data };
+}
