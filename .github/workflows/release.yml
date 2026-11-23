@@ -24,7 +24,14 @@ jobs:
         run: |
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --title "DeskPals $TAG" \
             --notes "See README for install steps (Gatekeeper / SmartScreen warnings are expected for unsigned builds)."
-          echo "id=$(gh api repos/$GITHUB_REPOSITORY/releases --jq ".[] | select(.tag_name==\"$TAG\") | .id")" >> "$GITHUB_OUTPUT"
+          # The release list is eventually consistent; look the draft up by tag, with retries.
+          for i in 1 2 3 4 5 6; do
+            id=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json databaseId --jq .databaseId 2>/dev/null || true)
+            [ -n "$id" ] && break
+            sleep 5
+          done
+          if [ -z "$id" ]; then echo "::error::could not resolve release id for $TAG"; exit 1; fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
   build:
     needs: create-release
@@ -79,4 +86,12 @@ jobs:
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "${{ github.ref_name }}" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Refuse to publish an incomplete release (the updater would 404 on latest.json).
+          assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          echo "$assets"
+          for pattern in 'latest.json' '\.dmg$' '-setup\.exe$'; do
+            echo "$assets" | grep -qE -- "$pattern" || { echo "::error::missing asset matching $pattern"; exit 1; }
+          done
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
