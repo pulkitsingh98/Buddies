@@ -1,3 +1,4 @@
+mod chores;
 mod hit_test;
 mod models;
 mod pet_windows;
@@ -25,6 +26,11 @@ pub fn run() {
         )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // Launch at login (opt-in from onboarding/settings).
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(hit_test::HitMasks::default())
         .manage(pet_windows::PetRuntime::default())
         .invoke_handler(tauri::generate_handler![
@@ -45,6 +51,14 @@ pub fn run() {
             windows::open_creator,
             windows::open_settings,
             windows::open_friends,
+            windows::open_chores,
+            chores::chores_preview,
+            chores::chores_apply,
+            chores::chores_undo_last,
+            chores::chores_history,
+            chores::quick_folder,
+            chores::quick_note,
+            chores::reveal,
             pet_windows::pets_out,
             pet_windows::spawn_visitor,
         ])
@@ -57,6 +71,12 @@ pub fn run() {
             app.manage(settings::SettingsState::load(
                 config_dir.join("settings.json"),
             ));
+            let data_dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&data_dir)?;
+            app.manage(
+                chores::MoveLog::open(&data_dir.join("deskpals.db"))
+                    .map_err(|e| format!("couldn't open the undo log: {e}"))?,
+            );
 
             tray::create(app.handle())?;
             hit_test::start(app.handle().clone());
@@ -64,8 +84,10 @@ pub fn run() {
             pet_windows::reconcile(app.handle());
             windows::start_social(app.handle())?;
 
-            // First run: no pets yet, so go straight to making one.
-            if pets::list_pets(app.handle().clone()).is_ok_and(|p| p.is_empty()) {
+            // First run: a short welcome (which ends by making a first pet).
+            if !app.state::<settings::SettingsState>().get().onboarded {
+                windows::show_onboarding(app.handle())?;
+            } else if pets::list_pets(app.handle().clone()).is_ok_and(|p| p.is_empty()) {
                 windows::show_creator(app.handle())?;
             }
             log::info!("DeskPals started v{}", app.package_info().version);

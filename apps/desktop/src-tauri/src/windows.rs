@@ -4,6 +4,8 @@ pub const SETTINGS: &str = "settings";
 pub const CREATOR: &str = "creator";
 pub const FRIENDS: &str = "friends";
 pub const SOCIAL: &str = "social";
+pub const CHORES: &str = "chores";
+pub const ONBOARDING: &str = "onboarding";
 
 /// Shows (or creates) a regular app window. Windows are destroyed on close, not hidden,
 /// so they cost no memory while pets run all day.
@@ -60,6 +62,19 @@ pub fn start_social(app: &AppHandle) -> tauri::Result<()> {
         .inner_size(200.0, 200.0)
         .build()?;
     Ok(())
+}
+
+pub fn show_chores(app: &AppHandle) -> tauri::Result<()> {
+    show(app, CHORES, "chores.html", "Chores", (520.0, 680.0))
+}
+
+pub fn show_onboarding(app: &AppHandle) -> tauri::Result<()> {
+    show(app, ONBOARDING, "onboarding.html", "Welcome to DeskPals", (560.0, 640.0))
+}
+
+#[tauri::command]
+pub fn open_chores(app: AppHandle) -> Result<(), String> {
+    show_chores(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

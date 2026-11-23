@@ -42,6 +42,8 @@ export default defineConfig({
         pet: resolve(import.meta.dirname, 'pet.html'),
         social: resolve(import.meta.dirname, 'social.html'),
         friends: resolve(import.meta.dirname, 'friends.html'),
+        chores: resolve(import.meta.dirname, 'chores.html'),
+        onboarding: resolve(import.meta.dirname, 'onboarding.html'),
       },
     },
   },

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { listen } from '@tauri-apps/api/event';
+import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import type { PetManifest } from '@deskpals/shared';
 import { APP_NAME } from '@deskpals/shared';
 import { ipc, type Settings } from '../lib/ipc';
@@ -212,6 +213,14 @@ export function App() {
         </label>
       ))}
 
+      <h2>App</h2>
+      <Autostart />
+      <p className="small">
+        <button className="link" onClick={() => void ipc.openChores()}>
+          Chores: tidy Desktop / Downloads, quick notes…
+        </button>
+      </p>
+
       <h2>Account</h2>
       <Account />
 
@@ -335,6 +344,29 @@ function Today() {
       {state?.focusStreak ? ` · 🔥 ${state.focusStreak}-day streak` : ''}
       {state?.mood ? ` · mood ${state.mood}` : ''}
     </p>
+  );
+}
+
+function Autostart() {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    void isEnabled()
+      .then(setOn)
+      .catch(() => setOn(false));
+  }, []);
+  if (on === null) return null;
+  return (
+    <label className="row">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          const next = e.target.checked;
+          void (next ? enable() : disable()).then(() => setOn(next)).catch(() => {});
+        }}
+      />
+      Start DeskPals when I log in
+    </label>
   );
 }
 

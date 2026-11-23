@@ -24,6 +24,35 @@ export interface Settings {
   moodCheckin: boolean;
   doNotDisturb: boolean;
   shareMood: boolean;
+  tidyDesktop: boolean;
+  sortDownloads: boolean;
+  onboarded: boolean;
+}
+
+export type ChoreFolder = 'desktop' | 'downloads';
+export interface TidyPlan {
+  moves: { from: string; to: string; category: string }[];
+  skipped: { name: string; reason: string }[];
+  dest: string;
+}
+export interface TidyReport {
+  batchId: string;
+  moved: number;
+  failed: { name: string; reason: string }[];
+  dest: string;
+}
+export interface UndoReport {
+  restored: number;
+  renamed: string[];
+  missing: string[];
+}
+export interface TidyBatch {
+  id: string;
+  folder: string;
+  dest: string;
+  at: number;
+  count: number;
+  undone: boolean;
 }
 
 export interface DownloadProgress {
@@ -64,6 +93,16 @@ export const ipc = {
   openCreator: () => invoke('open_creator'),
   openSettings: () => invoke('open_settings'),
   openFriends: () => invoke('open_friends'),
+  openChores: () => invoke('open_chores'),
+  tidyPreview: (folderId: ChoreFolder, petName: string, date: string) =>
+    invoke<TidyPlan>('chores_preview', { folderId, petName, date }),
+  tidyApply: (folderId: ChoreFolder, petName: string, date: string) =>
+    invoke<TidyReport>('chores_apply', { folderId, petName, date }),
+  undoLastTidy: () => invoke<UndoReport | null>('chores_undo_last'),
+  tidyHistory: () => invoke<TidyBatch[]>('chores_history'),
+  quickFolder: (name: string) => invoke<string>('quick_folder', { name }),
+  quickNote: (title: string, body: string) => invoke<string>('quick_note', { title, body }),
+  reveal: (path: string) => invoke('reveal', { path }),
   petsOut: () => invoke<number>('pets_out'),
   spawnVisitor: (id: string) => invoke('spawn_visitor', { id }),
 };

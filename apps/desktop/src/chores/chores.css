@@ -1,0 +1,53 @@
+.chores {
+  padding: 20px;
+}
+.card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 14px;
+  margin: 12px 0;
+}
+.card h2 {
+  margin-top: 0;
+}
+.cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.cat {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.files {
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 12px;
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.row-inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.chores textarea {
+  font: inherit;
+  width: 100%;
+  min-height: 70px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+  margin: 6px 0;
+}
+.ok {
+  color: #2e8b57;
+}

@@ -43,6 +43,12 @@ pub struct Settings {
     pub do_not_disturb: bool,
     /// Let friends see today's mood check-in.
     pub share_mood: bool,
+
+    // --- chores: folders the user explicitly allowed ---
+    pub tidy_desktop: bool,
+    pub sort_downloads: bool,
+    /// First-run onboarding finished.
+    pub onboarded: bool,
 }
 
 impl Default for Settings {
@@ -69,6 +75,9 @@ impl Default for Settings {
             mood_checkin: true,
             do_not_disturb: false,
             share_mood: false,
+            tidy_desktop: false,
+            sort_downloads: false,
+            onboarded: false,
         }
     }
 }

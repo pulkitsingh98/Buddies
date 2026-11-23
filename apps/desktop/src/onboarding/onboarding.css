@@ -1,0 +1,62 @@
+.onboarding {
+  padding: 32px 36px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.hero {
+  font-size: 56px;
+  text-align: center;
+  margin: 8px 0 4px;
+  animation: bob 2.4s ease-in-out infinite;
+}
+@keyframes bob {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.onboarding h1 {
+  text-align: center;
+  font-size: 24px;
+}
+.onboarding .lead {
+  text-align: center;
+  color: var(--muted);
+}
+.points {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+.points li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 20px 0 0;
+}
+.dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.dots span.on {
+  background: var(--accent);
+}
+.nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 22px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero {
+    animation: none;
+  }
+}

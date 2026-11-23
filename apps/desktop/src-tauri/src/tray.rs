@@ -15,7 +15,7 @@ const ITEMS: &[(&str, &str)] = &[
     ("toggle_pets", "Show / Hide Pets"),
     ("focus", "Start Focus Timer"),
     ("mood", "How Am I Feeling?"),
-    ("tidy", "Tidy Desktop…"),
+    ("tidy", "Tidy Desktop & Chores…"),
     ("friends", "Friends…"),
     ("settings", "Settings…"),
     ("pause", "Pause for 1 Hour"),
@@ -47,6 +47,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "settings" => {
                 if let Err(e) = windows::show_settings(app) {
                     log::error!("failed to open settings: {e}");
+                }
+            }
+            "tidy" => {
+                if let Err(e) = windows::show_chores(app) {
+                    log::error!("failed to open chores: {e}");
                 }
             }
             "friends" => {

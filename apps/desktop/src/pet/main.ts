@@ -10,6 +10,14 @@ import {
 import { ipc, type Settings } from '../lib/ipc';
 import { forwardErrors } from '../lib/log';
 import { EVENTS, send, type IncomingEvent } from '../lib/social';
+import {
+  CHORES_DONE,
+  choresPetName,
+  runTidy,
+  today,
+  undoTidy,
+  type ChoresDone,
+} from '../lib/chores';
 import { Behavior, type BehaviorConfig, type PetState } from './behavior';
 import { Expressions, type Reaction } from './expressions';
 import { FocusTimer } from './focus';
@@ -773,6 +781,55 @@ async function main() {
     wake();
   });
 
+  // --- chores: celebrate a tidy, and now and then offer one ---
+  void listen<ChoresDone>(CHORES_DONE, (e) => {
+    if (!isPrimary()) return;
+    const { report } = e.payload;
+    behavior.dispatch({ type: 'celebrate' });
+    view.addHearts(4);
+    ask(
+      `All tidy! ✨ I put ${report.moved} file${report.moved === 1 ? '' : 's'} in “${report.dest.split(/[\\/]/).slice(-2).join('/')}”.`,
+      [
+        {
+          label: '↩️ Undo',
+          onClick: () => void undoTidy().then(() => say('Put everything back 👍', 3000)),
+        },
+        { label: '👍 Thanks', onClick: () => react('hover') },
+      ],
+      30_000,
+    );
+    wake();
+  });
+  let nextTidyCheck = performance.now() + 10 * 60_000;
+  const offerTidy = (now: number) => {
+    if (now < nextTidyCheck || !settings.tidyDesktop || view.bubbleOpen || focus.phase !== 'idle')
+      return;
+    nextTidyCheck = now + 2 * 3600_000;
+    const key = 'deskpals:tidy-offered';
+    if (localStorage.getItem(key) === today()) return;
+    void choresPetName()
+      .then((name) => ipc.tidyPreview('desktop', name, today()))
+      .then((plan) => {
+        if (plan.moves.length < 15 || userIdleSec(performance.now()) > 60) return;
+        localStorage.setItem(key, today());
+        react('greet');
+        ask(
+          `Your Desktop has ${plan.moves.length} loose files. Want me to tidy up? 🧹`,
+          [
+            {
+              label: 'Tidy up!',
+              onClick: () =>
+                void runTidy('desktop').catch((err: unknown) => say(String(err), 5000)),
+            },
+            { label: 'Preview first', onClick: () => void ipc.openChores() },
+            { label: 'Not now', onClick: () => {} },
+          ],
+          60_000,
+        );
+      })
+      .catch(() => {});
+  };
+
   // --- settings, resize, suspension ---
   void listen<Settings>('settings://changed', (e) => {
     settings = e.payload;
@@ -834,6 +891,7 @@ async function main() {
     if (isPrimary()) {
       updateFocus();
       checkWellbeing(now);
+      offerTidy(now);
     }
 
     if (!shown) {

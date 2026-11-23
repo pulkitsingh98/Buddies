@@ -225,6 +225,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "auto-launch"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17918dba7ecf78b9a14507ec9f984e7977d13fad87dc86d61038980a45d128cf"
+dependencies = [
+ "dirs 6.0.0",
+ "os_info",
+ "smappservice-rs",
+ "thiserror 2.0.21",
+ "windows-registry",
+ "windows-result",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -801,12 +815,14 @@ dependencies = [
  "futures-util",
  "log",
  "reqwest",
+ "rusqlite",
  "rustls",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "tauri",
  "tauri-build",
+ "tauri-plugin-autostart",
  "tauri-plugin-log",
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
@@ -835,6 +851,15 @@ dependencies = [
  "block-buffer 0.12.1",
  "const-oid",
  "crypto-common 0.2.2",
+]
+
+[[package]]
+name = "dirs"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
+dependencies = [
+ "dirs-sys",
 ]
 
 [[package]]
@@ -1073,6 +1098,18 @@ dependencies = [
  "event-listener",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "fallible-iterator"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
+
+[[package]]
+name = "fallible-streaming-iterator"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "fastrand"
@@ -1571,6 +1608,18 @@ name = "hashbrown"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "735eaa21a6a5ffb2e84362faaeb90c05ba8e19797ca30428478cb6ea3a4921bc"
+dependencies = [
+ "foldhash",
+]
+
+[[package]]
+name = "hashlink"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a596f1b20ed2cc5ecac41a164aaebc7258057060f06c0cf7a2ba3991ee7990fb"
+dependencies = [
+ "hashbrown 0.17.2",
+]
 
 [[package]]
 name = "heck"
@@ -2229,6 +2278,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "libsqlite3-sys"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b06e69070b7e12262b0cd90832f0a7396f142a2b330181255562decf9f0c6215"
+dependencies = [
+ "cc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "link-section"
 version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2407,6 +2467,18 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "nix"
+version = "0.31.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bc81ce8148d3b4f3274da811f11cdd824ae661ee4ef732cdb229825cf5be7f7"
+dependencies = [
+ "bitflags 2.13.2",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+]
 
 [[package]]
 name = "nix"
@@ -2631,6 +2703,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-security"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "709fe137109bd1e8b5a99390f77a7d8b2961dafc1a1c5db8f2e60329ad6d895a"
+dependencies = [
+ "bitflags 2.13.2",
+ "objc2",
+ "objc2-core-foundation",
+]
+
+[[package]]
+name = "objc2-service-management"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b213642d6959cc6023ceb1217aa595eaaf09b8094ce95127c103cab611fe65e8"
+dependencies = [
+ "block2",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "objc2-security",
+]
+
+[[package]]
 name = "objc2-ui-kit"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2701,6 +2797,21 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
+]
+
+[[package]]
+name = "os_info"
+version = "3.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cf20a545b305cf1da722b236b5155c9bb35f1d5ceb28c048bd96ca842f41b5b"
+dependencies = [
+ "android_system_properties",
+ "log",
+ "nix 0.31.4",
+ "objc2",
+ "objc2-foundation",
+ "objc2-ui-kit",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3208,6 +3319,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsqlite-vfs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "353b74f9810d5b085b6c42c9d86a5f0fdb795553235cdd48753b32e3809d18a7"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "rusqlite"
+version = "0.43.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f172c4812a19b26d1c23cdb0070e69db335503dfa378b910eb857386e5b8beba"
+dependencies = [
+ "bitflags 2.13.2",
+ "fallible-iterator",
+ "fallible-streaming-iterator",
+ "hashlink",
+ "libsqlite3-sys",
+ "smallvec",
+ "sqlite-wasm-rs",
+]
+
+[[package]]
 name = "rustc-hash"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3706,6 +3841,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59"
 
 [[package]]
+name = "smappservice-rs"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52703b97a53101cf5d4580e0737aaa634ce1fdcfc123c16b2a9658e358013488"
+dependencies = [
+ "objc2",
+ "objc2-foundation",
+ "objc2-service-management",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "socket2"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3761,6 +3908,16 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "sqlite-wasm-rs"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6cd504cecbfe7eef649988840f9a6cb768d11085efec138f8e99f160632d867"
+dependencies = [
+ "cc",
+ "rsqlite-vfs",
 ]
 
 [[package]]
@@ -4009,7 +4166,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "cookie",
- "dirs",
+ "dirs 7.0.0",
  "dunce",
  "embed_plist",
  "getrandom 0.3.4",
@@ -4060,7 +4217,7 @@ checksum = "73d80784e874fa117b9b00a6680cf2f9b8a51bbd14406bea980cf8f328b00646"
 dependencies = [
  "anyhow",
  "cargo_toml",
- "dirs",
+ "dirs 7.0.0",
  "glob",
  "heck 0.5.0",
  "json-patch",
@@ -4133,6 +4290,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-autostart"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bce56ceb0a99b8ab5eebc977ba9ffc62391b862648cb9ab76fc8bc7231b8f7e2"
+dependencies = [
+ "auto-launch",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "tauri-plugin-log"
 version = "2.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4186,7 +4357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d957abbcb3f9f6c76d22a3a0f012f30880640d0bccb5634d2b12a9937e4c872b"
 dependencies = [
  "base64 0.23.1",
- "dirs",
+ "dirs 7.0.0",
  "flate2",
  "futures-util",
  "http",
@@ -4638,7 +4809,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2b9c52859a94554803ccd4a24b98f74148ebc73b90676d783f3490b1bff9d72"
 dependencies = [
  "crossbeam-channel",
- "dirs",
+ "dirs 7.0.0",
  "libappindicator",
  "muda",
  "objc2",
@@ -4757,6 +4928,12 @@ dependencies = [
  "serde_core",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "vcpkg"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version-compare"
@@ -5398,7 +5575,7 @@ dependencies = [
  "block2",
  "cookie",
  "crossbeam-channel",
- "dirs",
+ "dirs 7.0.0",
  "dom_query 0.29.0",
  "dpi",
  "dunce",
@@ -5641,7 +5818,7 @@ dependencies = [
  "indexmap 2.14.2",
  "libc",
  "memchr",
- "nix",
+ "nix 0.32.0",
  "typed-path",
  "windows-sys 0.61.2",
  "zeroize",
