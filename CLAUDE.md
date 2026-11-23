@@ -43,6 +43,7 @@ Full product spec lives in `docs/spec.md`; decisions and dependency justificatio
 - Updater: pubkey in `tauri.conf.json`; private key lives at `~/.tauri/deskpals-updater.key` on the dev Mac and in the `TAURI_SIGNING_PRIVATE_KEY` GitHub secret. Never commit it.
 
 ## Status
+
 - Phase 1 (pet on desktop): done — photo cutout + cartoon (FLUX.2 on Cloudflare free tier) pets, expressions, click-through.
 - Phase 2 (wellbeing): done — reminders, focus timer, daily message, compliments, mood check-in (src/pet/wellbeing.ts, focus.ts, messages.ts). Delivered only by the first active pet.
 - Settings live in `settings.json`; wellbeing counters in `wellbeing.json` (both in the app config dir). SQLite comes with the Phase 4 undo log.
