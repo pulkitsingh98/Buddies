@@ -8,6 +8,7 @@ import {
 import { ipc, type Settings } from '../lib/ipc';
 import { forwardErrors } from '../lib/log';
 import { Behavior, type BehaviorConfig, type PetState } from './behavior';
+import { Expressions } from './expressions';
 import { tickHz } from './pose';
 import { MASK_COLS, MASK_ROWS, PetView } from './view';
 
@@ -67,6 +68,17 @@ async function main() {
     geom.minX + Math.random() * (geom.maxX - geom.minX),
   );
 
+  // Cartoon pets have many drawn expressions; cutout pets have one frame.
+  const expr =
+    view.frameIds.size > 1
+      ? new Expressions(view.frameIds, Math.random, performance.now() / 1000)
+      : null;
+  let lastInteraction = performance.now();
+  const interacted = () => (lastInteraction = performance.now());
+  // Shake detection while dragging: several quick direction reversals.
+  let lastVelSign = 0;
+  let reversals: number[] = [];
+
   // --- click-through mask: sent whenever the clickable shape changes ---
   let lastMaskKey = '';
   const sendMask = () => {
@@ -98,8 +110,35 @@ async function main() {
         window.setTimeout(sendMask, 700);
       }
     }
-    view.setFlip(behavior.dir < 0);
+    // Cartoon frames are drawn facing right when walking and facing the viewer otherwise.
+    view.setFlip(behavior.dir < 0 && (!expr || behavior.state === 'walk'));
     view.setLift(behavior.lift);
+
+    if (expr) {
+      const now = performance.now();
+      if (behavior.state === 'drag') {
+        const v = behavior.dragVelocity;
+        const sign = Math.abs(v) > 600 ? Math.sign(v) : 0;
+        if (sign && lastVelSign && sign !== lastVelSign) {
+          reversals = [...reversals.filter((t) => now - t < 1200), now];
+          if (reversals.length >= 3) {
+            expr.react('shake', now / 1000);
+            reversals = [];
+          }
+        }
+        if (sign) lastVelSign = sign;
+      }
+      const frame = expr.frame(
+        {
+          state: behavior.state,
+          sleepy: behavior.sleepy,
+          sinceInteraction: (now - lastInteraction) / 1000,
+          userIdle: idleBase + (now - idleAt) / 1000,
+        },
+        now / 1000,
+      );
+      if (view.setFrame(frame)) sendMask();
+    }
   };
 
   // --- window position sync (coalesced: at most one setPosition in flight) ---
@@ -149,6 +188,7 @@ async function main() {
     if (e.button !== 0) return;
     clearTimeout(hoverTimer);
     markActive();
+    interacted();
     target.setPointerCapture(e.pointerId);
     press = { sx: e.screenX, sy: e.screenY, x: behavior.x, lift: behavior.lift, dragging: false };
   });
@@ -179,7 +219,9 @@ async function main() {
         behavior.lift = Math.max(0, g.floorTop - top);
       });
     } else {
+      const wasAsleep = behavior.state === 'sleep';
       behavior.dispatch({ type: 'pet' });
+      if (!wasAsleep) expr?.react('click', performance.now() / 1000);
     }
     wake();
   });
@@ -192,7 +234,9 @@ async function main() {
     hoverTimer = window.setTimeout(() => {
       if (press || performance.now() - lastHoverPet < 6000) return;
       lastHoverPet = performance.now();
+      interacted();
       behavior.dispatch({ type: 'pet' });
+      expr?.react('hover', performance.now() / 1000);
       wake();
     }, 900);
   });
@@ -221,6 +265,7 @@ async function main() {
   let timer: number | undefined;
   let last = performance.now();
   let shown = false;
+  let prevState: PetState = behavior.state;
   function wake() {
     clearTimeout(timer);
     timer = window.setTimeout(frame, 0);
@@ -248,6 +293,8 @@ async function main() {
           10000,
         );
     }
+    if (prevState === 'wake' && behavior.state === 'idle') expr?.react('greet', now / 1000);
+    prevState = behavior.state;
     syncView();
     if (!press?.dragging) syncPosition();
 
@@ -255,7 +302,9 @@ async function main() {
       shown = true;
       void win.show();
     }
-    timer = window.setTimeout(frame, 1000 / tickHz(behavior.state));
+    // Cartoon pets tick a little faster at rest so blinks and quirks land on time.
+    const hz = Math.max(tickHz(behavior.state), expr ? 8 : 0);
+    timer = window.setTimeout(frame, 1000 / hz);
   }
   wake();
 }

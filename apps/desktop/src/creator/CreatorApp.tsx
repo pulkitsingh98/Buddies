@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { PetKind } from '@deskpals/shared';
+import { CARTOON_FRAMES, type PetKind } from '@deskpals/shared';
 import { ipc } from '../lib/ipc';
+import { SignIn, useSession } from '../lib/SignIn';
 import {
+  CartoonGenerator,
   CutoutGenerator,
   resize,
   toCanvas,
   type GeneratedPet,
+  type GenerationProgress,
   type PetGenerator,
 } from './generator';
 import { OnDeviceRemover, type RemoverStatus } from './remover';
@@ -20,6 +23,7 @@ const FRAME_OUT = 512;
 type Step =
   | { kind: 'pick' }
   | { kind: 'working'; status: RemoverStatus | null }
+  | { kind: 'drawing'; progress: GenerationProgress | null }
   | { kind: 'adjust' }
   | { kind: 'review'; pet: GeneratedPet; url: string }
   | { kind: 'saved'; name: string };
@@ -30,8 +34,11 @@ const KINDS: { id: PetKind; label: string }[] = [
   { id: 'object', label: '🧸 Object' },
 ];
 
+type Style = 'cartoon' | 'cutout';
+
 const remover = new OnDeviceRemover();
-const generator: PetGenerator = new CutoutGenerator();
+const cutoutGenerator: PetGenerator = new CutoutGenerator();
+const cartoonGenerator: PetGenerator = new CartoonGenerator();
 
 export function CreatorApp() {
   const [step, setStep] = useState<Step>({ kind: 'pick' });
@@ -41,10 +48,29 @@ export function CreatorApp() {
   const [consent, setConsent] = useState(false);
   const [subject, setSubject] = useState<RawImage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [style, setStyle] = useState<Style>('cartoon');
+  const session = useSession();
 
   useEffect(() => () => remover.dispose(), []);
 
-  const canStart = photo && name.trim() && (kind !== 'person' || consent);
+  const needsSignIn = style === 'cartoon' && !session;
+  const canStart = photo && name.trim() && (kind !== 'person' || consent) && !needsSignIn;
+
+  async function drawCartoon() {
+    if (!photo) return;
+    setError(null);
+    setStep({ kind: 'drawing', progress: null });
+    try {
+      const pet = await cartoonGenerator.generate(
+        { name, kind, consentConfirmed: kind === 'person' ? consent : false, photo: photo.bitmap },
+        (progress) => setStep({ kind: 'drawing', progress }),
+      );
+      setStep({ kind: 'review', pet, url: URL.createObjectURL(pet.sprite) });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStep({ kind: 'pick' });
+    }
+  }
 
   async function choose(file: File | undefined) {
     if (!file || !file.type.startsWith('image/')) return;
@@ -103,7 +129,7 @@ export function CreatorApp() {
   async function finish(framed: RawImage) {
     setError(null);
     try {
-      const pet = await generator.generate({
+      const pet = await cutoutGenerator.generate({
         name,
         kind,
         consentConfirmed: kind === 'person' ? consent : false,
@@ -153,14 +179,21 @@ export function CreatorApp() {
           />
           <h2>Style</h2>
           <div className="kinds">
-            <button aria-pressed="true">📷 Photo cutout</button>
-            <button disabled title="Coming soon">
-              🎨 Cartoon · soon
+            <button aria-pressed={style === 'cartoon'} onClick={() => setStyle('cartoon')}>
+              🎨 Cartoon
+            </button>
+            <button aria-pressed={style === 'cutout'} onClick={() => setStyle('cutout')}>
+              📷 Photo cutout
             </button>
           </div>
           <p className="muted small">
-            Photo cutout animates your actual photo. Cartoon redraws it as an animated character.
+            {style === 'cartoon'
+              ? 'Redraws your photo as a cartoon character with 18 expressions and poses — laughs, blushes, sulks, waves, sleeps. Takes a few minutes; your photo is sent once to the image service and not stored.'
+              : 'Animates your actual photo with the background removed. Free, works offline, and the photo never leaves this computer.'}
           </p>
+          {needsSignIn && session === null && (
+            <SignIn reason="Cartoon pets are drawn by an AI service, so they need a (free) sign-in. You can make up to 6 a day." />
+          )}
           <h2>What is it?</h2>
           <div className="kinds">
             {KINDS.map((k) => (
@@ -181,10 +214,14 @@ export function CreatorApp() {
           )}
           {error && <p className="error">{error}</p>}
           <div className="actions">
-            {error && photo && (
+            {error && photo && style === 'cutout' && (
               <button onClick={() => void cutOut(true)}>Use the whole photo</button>
             )}
-            <button className="primary" disabled={!canStart} onClick={() => void cutOut()}>
+            <button
+              className="primary"
+              disabled={!canStart}
+              onClick={() => void (style === 'cartoon' ? drawCartoon() : cutOut())}
+            >
               Make my pet
             </button>
           </div>
@@ -192,6 +229,8 @@ export function CreatorApp() {
       )}
 
       {step.kind === 'working' && <Working status={step.status} />}
+
+      {step.kind === 'drawing' && <Drawing progress={step.progress} />}
 
       {step.kind === 'adjust' && subject && (
         <Adjust
@@ -205,13 +244,21 @@ export function CreatorApp() {
       {step.kind === 'review' && (
         <>
           <h1>Meet {step.pet.manifest.name}!</h1>
-          <p className="muted">This is how your pet will look on the desktop.</p>
+          <p className="muted">
+            {step.pet.manifest.style === 'stylized'
+              ? `All of ${step.pet.manifest.name}'s faces and poses.`
+              : 'This is how your pet will look on the desktop.'}
+          </p>
           <div className="review checker">
             <img src={step.url} alt={step.pet.manifest.name} />
           </div>
           {error && <p className="error">{error}</p>}
           <div className="actions">
-            <button onClick={() => setStep({ kind: 'adjust' })}>Back</button>
+            {step.pet.manifest.style === 'stylized' ? (
+              <button onClick={() => void drawCartoon()}>Draw again</button>
+            ) : (
+              <button onClick={() => setStep({ kind: 'adjust' })}>Back</button>
+            )}
             <button className="primary" onClick={() => void save(step.pet)}>
               Put it on my desktop
             </button>
@@ -223,8 +270,8 @@ export function CreatorApp() {
         <>
           <h1>{step.name} is out! 🎉</h1>
           <p>
-            Look at the bottom of your screen. Click your pet to pet it, double-click to make it
-            celebrate, and drag it anywhere.
+            Look at the bottom of your screen. Click it, hover over it, double-click it, drag it
+            around (try giving it a shake) — and see how it reacts.
           </p>
           <div className="actions">
             <button onClick={reset}>Make another</button>
@@ -301,6 +348,58 @@ function Working({ status }: { status: RemoverStatus | null }) {
         {status?.phase === 'segmenting' ? 'Finding the subject — a few seconds.' : 'Getting ready…'}
       </p>
       <progress />
+    </>
+  );
+}
+
+const FRAME_LABELS: Record<string, string> = {
+  neutral: 'Hello',
+  blink: 'Blink',
+  happy: 'Happy',
+  laugh: 'Laugh',
+  love: 'Love',
+  blush: 'Blush',
+  surprised: 'Surprised',
+  sad: 'Sad',
+  grumpy: 'Grumpy',
+  sleepy: 'Sleepy',
+  asleep: 'Asleep',
+  wink: 'Wink',
+  dizzy: 'Dizzy',
+  walk1: 'Walk',
+  walk2: 'Walk',
+  sit: 'Sit',
+  wave: 'Wave',
+  celebrate: 'Yay!',
+};
+
+function Drawing({ progress }: { progress: GenerationProgress | null }) {
+  const done = progress ? Object.keys(progress.previews).length : 0;
+  return (
+    <>
+      <h1>{done === 0 ? 'Drawing your character…' : 'Drawing expressions…'}</h1>
+      <p className="muted">
+        {done === 0
+          ? 'First the main character (about 30 seconds)…'
+          : `${done} of ${CARTOON_FRAMES.length} done. This takes a couple of minutes.`}
+      </p>
+      <progress value={done} max={CARTOON_FRAMES.length} />
+      <div className="frames">
+        {CARTOON_FRAMES.map((f) => {
+          const url = progress?.previews[f];
+          const failed = progress?.failed.includes(f);
+          return (
+            <figure key={f} className="checker">
+              {url ? (
+                <img src={url} alt={f} />
+              ) : (
+                <span className="muted">{failed ? '✕' : '…'}</span>
+              )}
+              <figcaption>{FRAME_LABELS[f] ?? f}</figcaption>
+            </figure>
+          );
+        })}
+      </div>
     </>
   );
 }
