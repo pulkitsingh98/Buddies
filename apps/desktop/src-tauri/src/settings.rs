@@ -160,7 +160,7 @@ pub fn get_settings(state: State<'_, SettingsState>) -> Settings {
 
 /// Merges a partial JSON object into the settings.
 #[tauri::command]
-pub fn update_settings(app: AppHandle, patch: serde_json::Value) -> Result<Settings, String> {
+pub async fn update_settings(app: AppHandle, patch: serde_json::Value) -> Result<Settings, String> {
     apply(&app, |s| {
         let mut value = serde_json::to_value(&*s).unwrap_or_default();
         if let (Some(obj), Some(patch)) = (value.as_object_mut(), patch.as_object()) {

@@ -79,21 +79,21 @@ pub fn show_onboarding(app: &AppHandle) -> tauri::Result<()> {
 }
 
 #[tauri::command]
-pub fn open_chores(app: AppHandle) -> Result<(), String> {
+pub async fn open_chores(app: AppHandle) -> Result<(), String> {
     show_chores(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn open_friends(app: AppHandle) -> Result<(), String> {
+pub async fn open_friends(app: AppHandle) -> Result<(), String> {
     show_friends(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn open_creator(app: AppHandle) -> Result<(), String> {
+pub async fn open_creator(app: AppHandle) -> Result<(), String> {
     show_creator(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn open_settings(app: AppHandle) -> Result<(), String> {
+pub async fn open_settings(app: AppHandle) -> Result<(), String> {
     show_settings(&app).map_err(|e| e.to_string())
 }

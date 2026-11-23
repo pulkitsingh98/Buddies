@@ -99,7 +99,7 @@ pub fn save_pet_sprite(app: AppHandle, request: Request<'_>) -> Result<(), Strin
 
 /// Writes the manifest (after the sprite) and puts the new pet out on the desktop.
 #[tauri::command]
-pub fn save_pet_manifest(app: AppHandle, manifest: serde_json::Value) -> Result<(), String> {
+pub async fn save_pet_manifest(app: AppHandle, manifest: serde_json::Value) -> Result<(), String> {
     let id = manifest["id"]
         .as_str()
         .ok_or("manifest.id missing")?
@@ -121,7 +121,7 @@ pub fn save_pet_manifest(app: AppHandle, manifest: serde_json::Value) -> Result<
 
 /// Deletes the pet's sprite and manifest. (Phase 3 also deletes its cloud copy.)
 #[tauri::command]
-pub fn delete_pet(app: AppHandle, id: String) -> Result<(), String> {
+pub async fn delete_pet(app: AppHandle, id: String) -> Result<(), String> {
     let dir = pet_dir(&app, &id)?;
     settings::apply(&app, |s| s.active_pets.retain(|p| p != &id))?;
     if dir.exists() {

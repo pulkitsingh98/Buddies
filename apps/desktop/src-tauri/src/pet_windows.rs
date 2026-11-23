@@ -100,7 +100,7 @@ pub fn pets_out(app: AppHandle) -> usize {
 
 /// Shows a friend's pet visiting, for the given interaction id. The page loads the details itself.
 #[tauri::command]
-pub fn spawn_visitor(app: AppHandle, id: String) -> Result<(), String> {
+pub async fn spawn_visitor(app: AppHandle, id: String) -> Result<(), String> {
     if !crate::pets::valid_id(&id) {
         return Err("invalid visit id".into());
     }
